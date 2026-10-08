@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const RevoApp());
 }
 
@@ -10,17 +18,14 @@ class RevoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Revo — Theatre Production Management System',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
-        useMaterial3: true,
-      ),
-      home: const Scaffold(
-        body: Center(
-          child: Text(
-            'Revo Theatre Production Management System',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
+      debugShowCheckedModeBanner: false,
+      title: 'Revo',
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Revo Theatre'),
+        ),
+        body: const Center(
+          child: Text('Firebase Connected Successfully'),
         ),
       ),
     );
