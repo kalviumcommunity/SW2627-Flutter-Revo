@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"revo-theatre-management","appId":"1:461169639709:android:d38e17cf4d3eb3f70e21f4","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"revo-theatre-management","configurations":{"android":"1:461169639709:android:d38e17cf4d3eb3f70e21f4","web":"1:461169639709:web:2da59bf5df27fd0b0e21f4"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "revo-theatre-management",
+          "appId": "1:461169639709:android:d38e17cf4d3eb3f70e21f4",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "revo-theatre-management",
+          "configurations": {
+            "android": "1:461169639709:android:d38e17cf4d3eb3f70e21f4",
+            "web": "1:461169639709:web:2da59bf5df27fd0b0e21f4"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-south1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

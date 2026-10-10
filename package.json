@@ -1,0 +1,27 @@
+{
+  "name": "sw2627-flutter-revo-1",
+  "version": "1.0.0",
+  "description": "> **Mobile Theatre Production Coordination System** built with Flutter & Dart, powered by Firebase Authentication & Cloud Firestore. Developed by Team **S130-Revo** under the Kalvium Community.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kalviumcommunity/SW2627-Flutter-Revo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kalviumcommunity/SW2627-Flutter-Revo/issues"
+  },
+  "homepage": "https://github.com/kalviumcommunity/SW2627-Flutter-Revo#readme",
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  }
+}
