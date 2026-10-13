@@ -1,3 +1,4 @@
+import '../core/enums/revo_enums.dart';
 import '../models/app_user.dart';
 
 abstract class AuthService {
@@ -6,6 +7,7 @@ abstract class AuthService {
     required String name,
     required String email,
     required String password,
+    UserRole role = UserRole.cast,
   });
   Future<AppUser> login({
     required String email,

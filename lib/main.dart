@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'features/auth/role_based_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,16 +19,16 @@ class RevoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Revo — Theatre Production Management System',
       debugShowCheckedModeBanner: false,
-      title: 'Revo',
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Revo Theatre'),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF6750A4),
+          brightness: Brightness.light,
         ),
-        body: const Center(
-          child: Text('Firebase Connected Successfully'),
-        ),
+        useMaterial3: true,
       ),
+      home: const RoleBasedRouter(),
     );
   }
 }
