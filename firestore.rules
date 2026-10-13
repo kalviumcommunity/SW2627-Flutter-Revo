@@ -1,9 +1,89 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userRole() {
+      return signedIn()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+
+    function isAdmin() {
+      return userRole() == "ADMIN";
+    }
+
+    function isDirector() {
+      return userRole() == "DIRECTOR";
+    }
+
+    function isCast() {
+      return userRole() == "CAST_MEMBER";
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() &&
+        (request.auth.uid == uid || isAdmin());
+
+      allow create: if isAdmin();
+
+      allow update: if isAdmin() ||
+        (request.auth.uid == uid &&
+         request.resource.data.role == resource.data.role);
+
+      allow delete: if isAdmin();
+    }
+
+    match /productions/{productionId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isDirector();
+    }
+
+    match /auditions/{auditionId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isDirector();
+    }
+
+    match /applications/{applicationId} {
+      allow read: if signedIn();
+      allow create: if isCast();
+      allow update, delete: if isAdmin() || isDirector();
+    }
+
+    match /roles/{roleId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isDirector();
+    }
+
+    match /castAssignments/{assignmentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isDirector();
+    }
+
+    match /rehearsals/{rehearsalId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isDirector();
+    }
+
+    match /venues/{venueId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() &&
+        resource.data.userId == request.auth.uid;
+
+      allow update: if signedIn() &&
+        resource.data.userId == request.auth.uid;
+
+      allow create: if isAdmin() || isDirector();
+      allow delete: if isAdmin();
     }
   }
 }
