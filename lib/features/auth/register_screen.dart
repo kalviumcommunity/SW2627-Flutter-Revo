@@ -170,7 +170,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 color: RevoColors.errorSurface,
                                 borderRadius: RevoSpacing.borderRadiusButton,
                                 border: Border.all(
-                                  color: RevoColors.errorCrimson.withOpacity(0.3),
+                                  color: RevoColors.errorCrimson.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -313,7 +313,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 color: RevoColors.warningSurface,
                                 borderRadius: RevoSpacing.borderRadiusButton,
                                 border: Border.all(
-                                  color: RevoColors.warningAmber.withOpacity(0.5),
+                                  color: RevoColors.warningAmber.withValues(alpha: 0.5),
                                 ),
                               ),
                               child: Row(
@@ -376,8 +376,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 20),
 
                     // Back to Login
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           'Already have an account?',

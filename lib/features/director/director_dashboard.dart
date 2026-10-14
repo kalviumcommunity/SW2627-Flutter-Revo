@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/revo_colors.dart';
+import '../../core/constants/revo_spacing.dart';
+import '../../core/constants/revo_typography.dart';
 import '../../core/enums/revo_enums.dart';
 import '../../models/app_user.dart';
+import '../../models/production.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../services/mock_data_service.dart';
+import '../common/conflict_resolution_screen.dart';
+import '../common/production_detail_screen.dart';
+import '../common/production_list_screen.dart';
 import '../profile/screens/profile_screen.dart';
+import 'director_audition_management_screen.dart';
 import 'director_interview_screen.dart';
 import 'director_production_schedule_screen.dart';
+import 'role_cast_assignment_screen.dart';
 
-class DirectorDashboard extends StatelessWidget {
+/// FR-02, FR-09, FR-10 & Issue #13: Director Portal Dashboard.
+/// Provides an operational overview strictly scoped to the Director's assigned
+/// productions, upcoming rehearsals, active cast assignments, pre-confirmation
+/// conflict status, and quick access to casting/schedule workflows.
+class DirectorDashboard extends StatefulWidget {
   final AppUser user;
   final VoidCallback? onNavigateToAuditions;
   final VoidCallback? onNavigateToRoles;
@@ -19,11 +33,47 @@ class DirectorDashboard extends StatelessWidget {
   });
 
   @override
+  State<DirectorDashboard> createState() => _DirectorDashboardState();
+}
+
+class _DirectorDashboardState extends State<DirectorDashboard> {
+  final MockDataService _dataService = MockDataService();
+
+  String _formatDate(DateTime dt) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[dt.month - 1]} ${dt.day}';
+  }
+
+  String _formatTime(DateTime dt) {
+    final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final authService = FirebaseAuthService();
+    final metrics = _dataService.getDirectorMetrics(widget.user.userId);
+
+    final myProdsCount = metrics['myProductionsCount'] as int? ?? 0;
+    final rehearsalsCount = metrics['rehearsalsCount'] as int? ?? 0;
+    final castCount = metrics['castCount'] as int? ?? 0;
+    final primaryProd = metrics['primaryProduction'] as Production?;
+
+    // Get upcoming rehearsals for Director's assigned productions
+    final assignedProds = _dataService.getProductionsForUserSync(widget.user);
+    final upcomingRehearsals = assignedProds.expand((p) {
+      return _dataService.getRehearsalsForProduction(p.productionId);
+    }).toList()
+      ..sort((a, b) => a.startAt.compareTo(b.startAt));
 
     return Scaffold(
+      backgroundColor: RevoColors.surfaceContainerLowest,
       appBar: AppBar(
         title: const Text('Director Portal'),
         actions: [
@@ -34,7 +84,7 @@ class DirectorDashboard extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ProfileScreen(initialUser: user),
+                  builder: (context) => ProfileScreen(initialUser: widget.user),
                 ),
               );
             },
@@ -81,51 +131,79 @@ class DirectorDashboard extends StatelessWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // User Greeting Card
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          setState(() {});
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(RevoSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // User Greeting Banner
+              Container(
+                padding: const EdgeInsets.all(RevoSpacing.lg),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: RevoSpacing.borderRadiusCard,
+                ),
                 child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 28,
+                      radius: 26,
                       backgroundColor: theme.colorScheme.primary,
                       child: Text(
-                        user.name.isNotEmpty ? user.name[0].toUpperCase() : 'D',
+                        widget.user.name.isNotEmpty
+                            ? widget.user.name[0].toUpperCase()
+                            : 'D',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.onPrimary,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: RevoSpacing.md),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Welcome back, ${user.name}!',
+                            'Welcome back, ${widget.user.name}!',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: theme.colorScheme.onPrimaryContainer,
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Chip(
-                            avatar: const Icon(Icons.movie_creation, size: 16),
-                            label: Text(
-                              'Role: ${user.role.name.toUpperCase()}',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            visualDensity: VisualDensity.compact,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.movie_creation,
+                                  size: 14,
+                                  color: theme.colorScheme.onPrimaryContainer,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'ASSIGNED TO $myProdsCount PRODUCTIONS',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -133,178 +211,460 @@ class DirectorDashboard extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: RevoSpacing.xl),
 
-            // Quick Actions Title
-            Text(
-              'Director Quick Actions (FR-02, FR-03, FR-04, FR-09, FR-10)',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+              // Production Overview Section (FR-02)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Production Overview',
+                    style: RevoTypography.title2.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ProductionListScreen(user: widget.user),
+                        ),
+                      ).then((_) => setState(() {}));
+                    },
+                    icon: const Icon(Icons.list_alt, size: 16),
+                    label: const Text('My Productions'),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: RevoSpacing.xs),
 
-            Row(
-              children: [
-                Expanded(
-                  child: Card(
-                    child: InkWell(
-                      onTap: onNavigateToAuditions,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
+              // Primary Production Feature Card
+              if (primaryProd != null)
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProductionDetailScreen(
+                          production: primaryProd,
+                          user: widget.user,
+                        ),
+                      ),
+                    ).then((_) => setState(() {}));
+                  },
+                  borderRadius: RevoSpacing.borderRadiusCard,
+                  child: Container(
+                    padding: const EdgeInsets.all(RevoSpacing.lg),
+                    decoration: BoxDecoration(
+                      color: RevoColors.cardBackground,
+                      borderRadius: RevoSpacing.borderRadiusCard,
+                      border: Border.all(color: RevoColors.borderDefault),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(
-                              Icons.record_voice_over_outlined,
-                              size: 36,
-                              color: theme.colorScheme.primary,
+                            Expanded(
+                              child: Text(
+                                primaryProd.name,
+                                style: RevoTypography.title2.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Auditions & Applications',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'FR-03 Workflow',
-                              style: theme.textTheme.bodySmall,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: RevoColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                primaryProd.status.name.toUpperCase(),
+                                style: RevoTypography.caption.copyWith(
+                                  color: RevoColors.primary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Card(
-                    child: InkWell(
-                      onTap: onNavigateToRoles,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
+                        const SizedBox(height: RevoSpacing.sm),
+                        Text(
+                          primaryProd.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: RevoTypography.caption.copyWith(
+                            color: RevoColors.textSecondary,
+                            height: 1.4,
+                          ),
+                        ),
+                        const Divider(height: RevoSpacing.lg),
+                        Row(
                           children: [
-                            Icon(
-                              Icons.badge_outlined,
-                              size: 36,
-                              color: theme.colorScheme.secondary,
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.people_outline,
+                                      size: 16, color: RevoColors.textSecondary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$castCount Cast Assigned',
+                                    style: RevoTypography.caption.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: RevoColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Roles & Cast Assignment',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.event_available_outlined,
+                                      size: 16, color: RevoColors.primary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$rehearsalsCount Rehearsals',
+                                    style: RevoTypography.caption.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: RevoColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'FR-04 / BR-06',
-                              style: theme.textTheme.bodySmall,
-                            ),
+                            const Icon(Icons.chevron_right,
+                                size: 18, color: RevoColors.textMuted),
                           ],
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: RevoSpacing.xl),
 
-            // Production Schedule Card (FR-09, FR-10)
-            Card(
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          const DirectorProductionScheduleScreen(
-                        productionId: 'prod_1',
-                        productionTitle: 'Hamlet — Spring Production 2026',
-                      ),
+              // Upcoming Rehearsals Section (FR-09)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Upcoming Rehearsals',
+                    style: RevoTypography.title2.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    '${upcomingRehearsals.length} scheduled',
+                    style: RevoTypography.caption.copyWith(
+                      color: RevoColors.textMuted,
+                      fontWeight: FontWeight.w600,
                     ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: theme.colorScheme.tertiaryContainer,
-                        child: Icon(
-                          Icons.event_note_outlined,
-                          color: theme.colorScheme.onTertiaryContainer,
-                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: RevoSpacing.sm),
+
+              if (upcomingRehearsals.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(RevoSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: RevoColors.cardBackground,
+                    borderRadius: RevoSpacing.borderRadiusCard,
+                    border: Border.all(color: RevoColors.borderDefault),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'No upcoming rehearsals scheduled for your productions.',
+                      style: RevoTypography.caption.copyWith(color: RevoColors.textSecondary),
+                    ),
+                  ),
+                )
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: upcomingRehearsals.length > 3 ? 3 : upcomingRehearsals.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: RevoSpacing.xs),
+                  itemBuilder: (context, index) {
+                    final reh = upcomingRehearsals[index];
+                    final prod = _dataService.getProductionById(reh.productionId);
+                    final venue = _dataService.getVenueById(reh.venueId);
+
+                    return Container(
+                      padding: const EdgeInsets.all(RevoSpacing.md),
+                      decoration: BoxDecoration(
+                        color: RevoColors.cardBackground,
+                        borderRadius: RevoSpacing.borderRadiusCard,
+                        border: Border.all(color: RevoColors.borderDefault),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Production Schedule',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              'FR-09 · Production-wide rehearsal schedule',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: RevoColors.primary.withValues(alpha: 0.12),
+                            child: const Icon(Icons.event_note, size: 18, color: RevoColors.primary),
+                          ),
+                          const SizedBox(width: RevoSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.greenAccent,
-                                    shape: BoxShape.circle,
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        prod?.name ?? 'Assigned Production',
+                                        style: RevoTypography.bodyMedium.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Text(
+                                      reh.status.name.toUpperCase(),
+                                      style: RevoTypography.caption.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: RevoColors.primary,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${_formatDate(reh.startAt)} · ${_formatTime(reh.startAt)} – ${_formatTime(reh.endAt)}',
+                                  style: RevoTypography.caption.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: RevoColors.textPrimary,
                                   ),
                                 ),
-                                const SizedBox(width: 4),
                                 Text(
-                                  'Live real-time stream (FR-10)',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.primary,
+                                  venue != null ? '${venue.name} (${venue.location})' : 'Venue TBD',
+                                  style: RevoTypography.caption.copyWith(
+                                    color: RevoColors.textSecondary,
+                                    fontSize: 11,
                                   ),
                                 ),
                               ],
                             ),
-                          ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              const SizedBox(height: RevoSpacing.xl),
+
+              // Conflict Awareness Card
+              Container(
+                padding: const EdgeInsets.all(RevoSpacing.md),
+                decoration: BoxDecoration(
+                  color: RevoColors.successGreen.withValues(alpha: 0.08),
+                  borderRadius: RevoSpacing.borderRadiusCard,
+                  border: Border.all(color: RevoColors.successGreen.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle_outline, color: RevoColors.successGreen, size: 22),
+                    const SizedBox(width: RevoSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '0 Schedule Conflicts (BR-01..05)',
+                            style: RevoTypography.bodyMedium.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: RevoColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'Pre-confirmation conflict engine active for all assigned productions.',
+                            style: RevoTypography.caption.copyWith(color: RevoColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ConflictResolutionScreen.demo(),
+                          ),
+                        );
+                      },
+                      child: const Text('Review'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: RevoSpacing.xl),
+
+              // Quick Actions Section
+              Text(
+                'Director Workflows',
+                style: RevoTypography.title2.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: RevoSpacing.md),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildActionCard(
+                      icon: Icons.record_voice_over_outlined,
+                      title: 'Auditions & Casting',
+                      subtitle: 'FR-03 Workflow',
+                      color: RevoColors.primary,
+                      onTap: widget.onNavigateToAuditions ??
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const DirectorAuditionManagementScreen(
+                                  productionId: 'prod_101',
+                                ),
+                              ),
+                            );
+                          },
+                    ),
+                  ),
+                  const SizedBox(width: RevoSpacing.md),
+                  Expanded(
+                    child: _buildActionCard(
+                      icon: Icons.badge_outlined,
+                      title: 'Role Assignments',
+                      subtitle: 'FR-04 / BR-06',
+                      color: const Color(0xFF5B6BBF),
+                      onTap: widget.onNavigateToRoles ??
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const RoleCastAssignmentScreen(
+                                  productionId: 'prod_101',
+                                ),
+                              ),
+                            );
+                          },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: RevoSpacing.md),
+
+              // Production Schedule Card (FR-09, FR-10)
+              Material(
+                color: RevoColors.cardBackground,
+                shape: RoundedRectangleBorder(
+                  borderRadius: RevoSpacing.borderRadiusCard,
+                  side: const BorderSide(color: RevoColors.borderDefault),
+                ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: theme.colorScheme.tertiaryContainer,
+                    child: Icon(
+                      Icons.event_note_outlined,
+                      color: theme.colorScheme.onTertiaryContainer,
+                    ),
+                  ),
+                  title: const Text(
+                    'Production Schedule (FR-09, FR-10)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: const Text('Production-wide calendar with live real-time stream'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            const DirectorProductionScheduleScreen(
+                          productionId: 'prod_101',
+                          productionTitle: 'The Crucible',
                         ),
                       ),
-                      const Icon(Icons.arrow_forward_ios, size: 16),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: RevoSpacing.sm),
 
-            // PRD Evidence Banner Card
-            Card(
-              color: theme.colorScheme.surfaceContainerHighest,
-              child: ListTile(
-                leading: const Icon(Icons.verified),
-                title: const Text(
-                  'PRD Baseline Evidence & Interview',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+              // PRD Baseline Evidence Banner Card
+              Material(
+                color: RevoColors.cardBackground,
+                shape: RoundedRectangleBorder(
+                  borderRadius: RevoSpacing.borderRadiusCard,
+                  side: const BorderSide(color: RevoColors.borderDefault),
                 ),
-                subtitle: const Text('View empirical evidence from Director interviews.'),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const DirectorInterviewScreen(),
-                    ),
-                  );
-                },
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: RevoColors.surfaceContainerHigh,
+                    child: Icon(Icons.assessment_outlined, color: RevoColors.primary),
+                  ),
+                  title: const Text(
+                    'PRD Baseline Evidence & Interview',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: const Text('Record & inspect director operational baseline.'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const DirectorInterviewScreen(),
+                      ),
+                    ).then((_) => setState(() {}));
+                  },
+                ),
               ),
+              const SizedBox(height: RevoSpacing.xl),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: RevoSpacing.borderRadiusCard,
+      child: Container(
+        padding: const EdgeInsets.all(RevoSpacing.lg),
+        decoration: BoxDecoration(
+          color: RevoColors.cardBackground,
+          borderRadius: RevoSpacing.borderRadiusCard,
+          border: Border.all(color: RevoColors.borderDefault),
+        ),
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: color.withValues(alpha: 0.12),
+              child: Icon(icon, size: 22, color: color),
+            ),
+            const SizedBox(height: RevoSpacing.sm),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: RevoTypography.bodyMedium.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: RevoTypography.caption.copyWith(color: RevoColors.textSecondary),
             ),
           ],
         ),

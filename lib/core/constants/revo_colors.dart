@@ -74,4 +74,17 @@ class RevoColors {
 
   /// Disabled button and control surfaces.
   static const Color disabled = Color(0xFFC8CDD8);
+
+  // ── Semantic Aliases & Card Tokens ─────────────────────────────────────────
+  /// Card background surface.
+  static const Color cardBackground = surfaceContainerLowest;
+
+  /// Default border color.
+  static const Color borderDefault = surfaceDim;
+
+  /// Low emphasis / muted text.
+  static const Color textMuted = textTertiary;
+
+  /// High container surface tint.
+  static const Color surfaceContainerHigh = surfaceContainerLow;
 }

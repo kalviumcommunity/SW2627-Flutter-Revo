@@ -38,6 +38,34 @@ class ConflictResolutionScreen extends StatefulWidget {
     this.onResolved,
   });
 
+  factory ConflictResolutionScreen.demo() {
+    final now = DateTime.now();
+    return ConflictResolutionScreen(
+      conflictingRehearsal: Rehearsal(
+        rehearsalId: 'reh_demo_conflict',
+        productionId: 'prod_101',
+        venueId: 'ven_102',
+        startAt: now.add(const Duration(hours: 2)),
+        endAt: now.add(const Duration(hours: 4)),
+        participantIds: const ['usr_cast_201'],
+        status: RehearsalStatus.proposed,
+        clientPending: false,
+        createdBy: 'usr_dir_101',
+        createdAt: now,
+        updatedAt: now,
+      ),
+      conflict: RehearsalConflict(
+        type: ConflictType.venue,
+        conflictingRehearsalId: 'reh_101',
+        description:
+            'Studio A Rehearsal Hall double-booked for Act II blocking.',
+        conflictStart: now.add(const Duration(hours: 2)),
+        conflictEnd: now.add(const Duration(hours: 4)),
+        location: 'Studio A Rehearsal Hall',
+      ),
+    );
+  }
+
   @override
   State<ConflictResolutionScreen> createState() =>
       _ConflictResolutionScreenState();

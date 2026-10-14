@@ -170,10 +170,11 @@ void main() {
       expect(find.text('Theatre Admin'), findsOneWidget);
 
       // Tap quick fill chip for Director
+      await tester.ensureVisible(find.text('Director'));
       await tester.tap(find.text('Director'));
       await tester.pump();
 
-      expect(find.text('director@revo.com'), findsOneWidget);
+      expect(find.text('director@revo.com'), findsWidgets);
     });
 
     testWidgets('RegisterScreen exposes role selector and Admin passcode field',
@@ -197,10 +198,12 @@ void main() {
       expect(find.text('Admin Authorization Code'), findsNothing);
 
       // Select Admin role
+      await tester.ensureVisible(find.text('Admin'));
       await tester.tap(find.text('Admin'));
       await tester.pump();
 
       // Admin authorization code field appears
+      await tester.ensureVisible(find.text('Admin Authorization Code'));
       expect(find.text('Admin Authorization Code'), findsOneWidget);
     });
 

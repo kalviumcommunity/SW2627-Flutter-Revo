@@ -148,7 +148,9 @@ class RevoTheme {
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: RevoColors.surfaceContainerLowest,
         elevation: 8,
-        shape: RevoSpacing.borderRadiusModal,
+        shape: RoundedRectangleBorder(
+          borderRadius: RevoSpacing.borderRadiusModal,
+        ),
       ),
 
       // ── Typography ─────────────────────────────────────────────────────────
