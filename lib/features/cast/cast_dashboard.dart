@@ -9,6 +9,7 @@ import '../../services/schedule_service.dart';
 import '../common/conflict_resolution_screen.dart';
 import '../common/notifications_screen.dart';
 import '../common/offline_sync_banner.dart';
+import '../profile/screens/profile_screen.dart';
 import 'audition_application_screen.dart';
 import 'my_assignments_screen.dart';
 import 'my_schedule_screen.dart';
@@ -170,6 +171,19 @@ class _CastDashboardState extends State<CastDashboard> {
                     ),
                   ),
               ],
+            );
+          },
+        ),
+        // Profile Screen (FR-18)
+        IconButton(
+          icon: const Icon(Icons.account_circle_outlined, color: Color(0xFF171B26)),
+          tooltip: 'My Profile (FR-18)',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProfileScreen(initialUser: widget.user),
+              ),
             );
           },
         ),

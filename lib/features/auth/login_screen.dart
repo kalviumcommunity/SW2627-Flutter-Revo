@@ -1,12 +1,23 @@
 import 'package:flutter/material.dart';
-import '../../services/firebase_auth_service.dart';
+import '../../core/constants/revo_colors.dart';
+import '../../core/constants/revo_spacing.dart';
+import '../../core/constants/revo_typography.dart';
+import '../../core/widgets/app_brand_header.dart';
+import '../../core/widgets/app_text_field.dart';
+import '../../core/widgets/primary_button.dart';
+import '../../services/auth_service.dart';
+import '../../services/mock_auth_service.dart';
 
+/// FR-01 & Issue #8: Revo Login Screen.
+/// Built with Revo Design System shared widgets and isolated mock authentication.
 class LoginScreen extends StatefulWidget {
   final VoidCallback onNavigateToRegister;
+  final AuthService? authService;
 
   const LoginScreen({
     super.key,
     required this.onNavigateToRegister,
+    this.authService,
   });
 
   @override
@@ -15,15 +26,41 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'director@revo.com');
-  final _passwordController = TextEditingController(text: 'password123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
   bool _isLoading = false;
   String? _errorMessage;
 
-  final _authService = FirebaseAuthService();
+  late final AuthService _auth;
+
+  @override
+  void initState() {
+    super.initState();
+    _auth = widget.authService ?? MockAuthService();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _fillDemoCredentials(String email, String password) {
+    setState(() {
+      _emailController.text = email;
+      _passwordController.text = password;
+      _errorMessage = null;
+    });
+  }
 
   Future<void> _handleLogin() async {
+    // Dismiss keyboard
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
+    if (_isLoading) return; // Prevent duplicate submissions
 
     setState(() {
       _isLoading = true;
@@ -31,14 +68,17 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await _authService.login(
+      await _auth.login(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      // On success, role_based_router's stream listener automatically routes to the appropriate dashboard
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('RevoException: ', '').replaceFirst('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -49,182 +89,223 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
+      backgroundColor: RevoColors.surfaceBase,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(
+              horizontal: RevoSpacing.xl,
+              vertical: RevoSpacing.xxl,
+            ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              constraints: const BoxConstraints(maxWidth: 400),
               child: Form(
                 key: _formKey,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Brand Icon & Title
-                    Icon(
-                      Icons.theater_comedy,
-                      size: 64,
-                      color: theme.colorScheme.primary,
+                    // Revo Brand Header
+                    const AppBrandHeader(
+                      iconSize: 48,
+                      showSubtitle: true,
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Revo',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Theatre Production Management System',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 28),
 
-                    if (_errorMessage != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            color: theme.colorScheme.onErrorContainer,
-                          ),
-                        ),
+                    // Card Container
+                    Container(
+                      padding: const EdgeInsets.all(RevoSpacing.xl),
+                      decoration: BoxDecoration(
+                        color: RevoColors.surfaceContainerLowest,
+                        borderRadius: RevoSpacing.borderRadiusCard,
+                        border: Border.all(color: RevoColors.surfaceDim),
+                        boxShadow: RevoSpacing.cardShadow,
                       ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Email input
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Email Address',
-                        prefixIcon: Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your email address.';
-                        }
-                        if (!value.contains('@')) {
-                          return 'Please enter a valid email.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Password input
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your password.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Login Button
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _handleLogin,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Sign In',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Sign In',
+                            style: RevoTypography.title2.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: RevoColors.textPrimary,
                             ),
-                    ),
-                    const SizedBox(height: 16),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Enter your credentials to access your production hub.',
+                            style: RevoTypography.bodyMedium.copyWith(
+                              color: RevoColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
 
-                    // Demo Credentials helper
-                    Card(
-                      elevation: 0,
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Demo Test Accounts:',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
+                          // Error Banner
+                          if (_errorMessage != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: RevoColors.errorSurface,
+                                borderRadius: RevoSpacing.borderRadiusButton,
+                                border: Border.all(
+                                  color: RevoColors.errorCrimson.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline_rounded,
+                                    color: RevoColors.errorCrimson,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _errorMessage!,
+                                      style: const TextStyle(
+                                        color: RevoColors.errorCrimson,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 8,
-                              children: [
-                                ActionChip(
-                                  label: const Text('Director'),
-                                  onPressed: () {
-                                    _emailController.text = 'director@revo.com';
-                                  },
-                                ),
-                                ActionChip(
-                                  label: const Text('Cast Member'),
-                                  onPressed: () {
-                                    _emailController.text = 'cast@revo.com';
-                                  },
-                                ),
-                                ActionChip(
-                                  label: const Text('Admin'),
-                                  onPressed: () {
-                                    _emailController.text = 'admin@revo.com';
-                                  },
-                                ),
-                              ],
-                            ),
+                            const SizedBox(height: 16),
                           ],
-                        ),
+
+                          // Email Input
+                          AppTextField(
+                            label: 'Email Address',
+                            hint: 'director@revo.com',
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            prefixIcon: const Icon(
+                              Icons.email_outlined,
+                              color: RevoColors.textSecondary,
+                              size: 20,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your email address.';
+                              }
+                              if (!value.contains('@') || !value.contains('.')) {
+                                return 'Please enter a valid email address.';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Password Input
+                          AppTextField(
+                            label: 'Password',
+                            hint: '••••••••',
+                            controller: _passwordController,
+                            isPassword: true,
+                            textInputAction: TextInputAction.done,
+                            prefixIcon: const Icon(
+                              Icons.lock_outline_rounded,
+                              color: RevoColors.textSecondary,
+                              size: 20,
+                            ),
+                            onFieldSubmitted: (_) => _handleLogin(),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your password.';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Sign In Button
+                          PrimaryButton(
+                            label: 'Sign In',
+                            isLoading: _isLoading,
+                            icon: Icons.login_rounded,
+                            onPressed: _handleLogin,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
 
-                    // Navigate to Register
+                    // Demo Accounts Helper Card
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: RevoColors.surfaceContainerLow,
+                        borderRadius: RevoSpacing.borderRadiusCard,
+                        border: Border.all(color: RevoColors.surfaceDim),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.key_outlined,
+                                size: 16,
+                                color: RevoColors.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Mock Demo Accounts (Quick Fill):',
+                                style: RevoTypography.captionBadge.copyWith(
+                                  color: RevoColors.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _demoChip(
+                                label: 'Director',
+                                email: 'director@revo.com',
+                                color: RevoColors.primary,
+                              ),
+                              _demoChip(
+                                label: 'Cast Member',
+                                email: 'cast@revo.com',
+                                color: RevoColors.successGreen,
+                              ),
+                              _demoChip(
+                                label: 'Theatre Admin',
+                                email: 'admin@revo.com',
+                                color: RevoColors.warningText,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Register Link
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text("Don't have an account?"),
+                        Text(
+                          "Don't have an account yet?",
+                          style: RevoTypography.bodyMedium.copyWith(
+                            color: RevoColors.textSecondary,
+                          ),
+                        ),
                         TextButton(
                           onPressed: widget.onNavigateToRegister,
                           child: const Text('Register Here'),
@@ -238,6 +319,27 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _demoChip({
+    required String label,
+    required String email,
+    required Color color,
+  }) {
+    return ActionChip(
+      avatar: CircleAvatar(
+        radius: 6,
+        backgroundColor: color,
+      ),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+      backgroundColor: RevoColors.surfaceContainerLowest,
+      side: const BorderSide(color: RevoColors.surfaceDim),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      onPressed: () => _fillDemoCredentials(email, 'password123'),
     );
   }
 }

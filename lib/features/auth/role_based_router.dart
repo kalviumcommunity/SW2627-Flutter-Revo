@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
 import '../../core/enums/revo_enums.dart';
+import '../../core/widgets/loading_indicator.dart';
 import '../../models/app_user.dart';
-import '../../services/firebase_auth_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/mock_auth_service.dart';
 import '../admin/admin_dashboard.dart';
 import '../cast/cast_dashboard.dart';
 import '../director/director_dashboard.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 
+/// FR-01 & Issue #8: Centralized Role-Based Router.
+/// Manages authentication guards and role navigation between
+/// unauthenticated flows (Login/Register) and protected dashboards.
 class RoleBasedRouter extends StatefulWidget {
+  final AuthService? authService;
   final Widget Function(BuildContext context, AppUser user)? customDirectorView;
   final Widget Function(BuildContext context, AppUser user)? customCastView;
 
   const RoleBasedRouter({
     super.key,
+    this.authService,
     this.customDirectorView,
     this.customCastView,
   });
@@ -23,8 +30,14 @@ class RoleBasedRouter extends StatefulWidget {
 }
 
 class _RoleBasedRouterState extends State<RoleBasedRouter> {
-  final FirebaseAuthService _authService = FirebaseAuthService();
+  late final AuthService _authService;
   bool _showRegisterScreen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _authService = widget.authService ?? MockAuthService();
+  }
 
   void _toggleAuthScreen() {
     setState(() {
@@ -40,21 +53,25 @@ class _RoleBasedRouterState extends State<RoleBasedRouter> {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Scaffold(
             body: Center(
-              child: CircularProgressIndicator(),
+              child: AppLoadingIndicator.fullScreen(
+                message: 'Initializing Revo session...',
+              ),
             ),
           );
         }
 
         final user = snapshot.data;
 
-        // Unauthenticated guard
+        // Unauthenticated guard (FR-01)
         if (user == null) {
           if (_showRegisterScreen) {
             return RegisterScreen(
+              authService: _authService,
               onNavigateToLogin: _toggleAuthScreen,
             );
           }
           return LoginScreen(
+            authService: _authService,
             onNavigateToRegister: _toggleAuthScreen,
           );
         }

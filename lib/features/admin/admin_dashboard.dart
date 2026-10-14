@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/enums/revo_enums.dart';
 import '../../models/app_user.dart';
 import '../../services/firebase_auth_service.dart';
+import '../profile/screens/profile_screen.dart';
 
 class AdminDashboard extends StatelessWidget {
   final AppUser user;
@@ -20,6 +21,18 @@ class AdminDashboard extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Theatre Admin Portal'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: 'My Profile (FR-18)',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(initialUser: user),
+                ),
+              );
+            },
+          ),
           PopupMenuButton<UserRole>(
             icon: const Icon(Icons.swap_horiz),
             tooltip: 'Switch Demo Role Guard',

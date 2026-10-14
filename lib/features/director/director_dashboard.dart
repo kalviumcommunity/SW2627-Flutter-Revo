@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/enums/revo_enums.dart';
 import '../../models/app_user.dart';
 import '../../services/firebase_auth_service.dart';
+import '../profile/screens/profile_screen.dart';
 import 'director_interview_screen.dart';
 import 'director_production_schedule_screen.dart';
 
@@ -26,6 +27,18 @@ class DirectorDashboard extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Director Portal'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: 'My Profile (FR-18)',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(initialUser: user),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.assessment_outlined),
             tooltip: 'PRD Baseline Evidence',
