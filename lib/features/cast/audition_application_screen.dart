@@ -53,7 +53,7 @@ class AuditionApplicationScreen extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
-                          crossAxisAlignment: CrossAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -153,7 +153,7 @@ class AuditionApplicationScreen extends StatelessWidget {
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           backgroundColor: app.status == ApplicationStatus.selected
-                              ? Colors.greenContainer
+                              ? theme.colorScheme.primaryContainer
                               : theme.colorScheme.surfaceContainerHighest,
                         ),
                       ),

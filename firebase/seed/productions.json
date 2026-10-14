@@ -1,0 +1,22 @@
+[
+  {
+    "productionId": "production_001",
+    "name": "The Silent Stage",
+    "description": "A regional theatre production exploring communication and human relationships.",
+    "directorId": "user_director_001",
+    "startDate": "2026-11-01",
+    "endDate": "2026-12-15",
+    "status": "ACTIVE",
+    "createdAt": "2026-10-08T10:30:00Z"
+  },
+  {
+    "productionId": "production_002",
+    "name": "Echoes of Time",
+    "description": "A dramatic theatre production involving multiple cast members and rehearsal schedules.",
+    "directorId": "user_director_002",
+    "startDate": "2026-12-01",
+    "endDate": "2027-01-20",
+    "status": "PLANNED",
+    "createdAt": "2026-10-08T10:35:00Z"
+  }
+]

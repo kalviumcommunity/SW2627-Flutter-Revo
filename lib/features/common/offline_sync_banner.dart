@@ -152,7 +152,7 @@ class _OfflineBanner extends StatelessWidget {
         children: [
           AnimatedBuilder(
             animation: pulseAnimation,
-            builder: (_, __) => Opacity(
+            builder: (_, _) => Opacity(
               opacity: pulseAnimation.value,
               child: const Icon(
                 Icons.cloud_off_outlined,
