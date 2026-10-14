@@ -1,6 +1,5 @@
 import 'dart:async';
 import '../models/app_notification.dart';
-import '../core/enums/revo_enums.dart';
 import 'firebase_auth_service.dart';
 import 'notification_service.dart';
 

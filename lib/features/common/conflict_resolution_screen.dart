@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../models/rehearsal.dart';
 import '../../core/enums/revo_enums.dart';
 import '../../services/firebase_notification_service.dart';
-import '../../services/firebase_schedule_service.dart';
 
 /// FR-07: Conflict Detection model — holds detected venue or cast collision data.
 class RehearsalConflict {
@@ -116,7 +115,6 @@ class _ConflictResolutionScreenState extends State<ConflictResolutionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final conflict = widget.conflict;
     final rehearsal = widget.conflictingRehearsal;
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/enums/revo_enums.dart';
 import '../../services/firebase_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -71,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 key: _formKey,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Brand Icon & Title
                     Icon(
@@ -183,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Padding(
                         padding: const EdgeInsets.all(12.0),
                         child: Column(
-                          crossAxisAlignment: CrossAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Demo Test Accounts:',

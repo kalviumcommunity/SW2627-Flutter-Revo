@@ -31,7 +31,7 @@ class _DirectorAuditionManagementScreenState
         title: const Text('Create New Audition Posting (FR-03)'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Production ID: prod_1 (Hamlet)'),
             const SizedBox(height: 12),
@@ -139,7 +139,7 @@ class _DirectorAuditionManagementScreenState
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
-                    crossAxisAlignment: CrossAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -202,7 +202,7 @@ class _DirectorAuditionManagementScreenState
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             'Cast ID: ${app.castMemberId}',

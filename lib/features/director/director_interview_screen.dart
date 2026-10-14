@@ -14,7 +14,7 @@ class DirectorInterviewScreen extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header card
             Card(
@@ -32,7 +32,7 @@ class DirectorInterviewScreen extends StatelessWidget {
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'PRD Baseline Evidence & Interview Artifact',
@@ -106,7 +106,7 @@ class DirectorInterviewScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
-                  crossAxisAlignment: CrossAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildInterviewPoint(
                       'Q1: Core Coordination Pain Point',
@@ -173,7 +173,7 @@ class DirectorInterviewScreen extends StatelessWidget {
 
   Widget _buildInterviewPoint(String question, String answer) {
     return Column(
-      crossAxisAlignment: CrossAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           question,

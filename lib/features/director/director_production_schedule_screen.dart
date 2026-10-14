@@ -488,7 +488,7 @@ class _DirectorRehearsalCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: rehearsal.clientPending
             ? BorderSide(
-                color: theme.colorScheme.secondary.withOpacity(0.6),
+                color: theme.colorScheme.secondary.withValues(alpha: 0.6),
                 width: 1,
               )
             : BorderSide.none,
@@ -524,7 +524,7 @@ class _DirectorRehearsalCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.12),
+                    color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(

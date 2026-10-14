@@ -90,7 +90,7 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
         title: Text('Assign Cast Member to ${role.name}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'BR-06 Rule: Assigning a cast member will automatically set role status to ASSIGNED.',
@@ -195,7 +195,7 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
-                        crossAxisAlignment: CrossAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,

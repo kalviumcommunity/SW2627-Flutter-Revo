@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/enums/revo_enums.dart';
 import '../../models/cast_assignment.dart';
 import '../../services/firebase_cast_repository.dart';
 
@@ -48,7 +47,7 @@ class MyAssignmentsScreen extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Column(
-                    crossAxisAlignment: CrossAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Production: ${asgn.productionId}'),
                       Text('Assigned Date: ${asgn.assignedAt.toLocal().toString().split(' ')[0]}'),
