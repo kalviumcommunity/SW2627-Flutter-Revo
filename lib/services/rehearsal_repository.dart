@@ -8,6 +8,8 @@ class RehearsalInput {
   final DateTime startAt;
   final DateTime endAt;
   final List<String> participantIds;
+  final String? title;
+  final String? notes;
 
   RehearsalInput({
     required this.productionId,
@@ -15,6 +17,8 @@ class RehearsalInput {
     required this.startAt,
     required this.endAt,
     required this.participantIds,
+    this.title,
+    this.notes,
   });
 }
 

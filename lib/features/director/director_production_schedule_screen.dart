@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../core/enums/revo_enums.dart';
 import '../../models/rehearsal.dart';
+import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_rehearsal_repository.dart';
 import '../../services/firebase_schedule_service.dart';
-import '../../services/rehearsal_repository.dart';
 import '../../services/schedule_service.dart';
+import '../common/rehearsal_detail_screen.dart';
+import 'rehearsal_creation_screen.dart';
 
 /// FR-09: Production-wide schedule view for Directors — full cast & venue overview.
 /// FR-10: Real-time Firestore stream listener — all rehearsal changes propagate instantly.
@@ -182,143 +184,28 @@ class _DirectorProductionScheduleScreenState
     }
   }
 
-  void _showAddRehearsalSheet() {
-    final venueController = TextEditingController(text: 'Studio A - Main Stage');
-    DateTime startAt = DateTime.now().add(const Duration(days: 1, hours: 10));
-    DateTime endAt = DateTime.now().add(const Duration(days: 1, hours: 13));
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        maxChildSize: 0.9,
-        minChildSize: 0.4,
-        expand: false,
-        builder: (ctx, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          padding: EdgeInsets.fromLTRB(
-              24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Schedule New Rehearsal',
-                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Production: ${widget.productionTitle}',
-                style: Theme.of(ctx).textTheme.bodySmall,
-              ),
-              const Divider(height: 24),
-              TextField(
-                controller: venueController,
-                decoration: const InputDecoration(
-                  labelText: 'Venue',
-                  prefixIcon: Icon(Icons.location_on_outlined),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.access_time),
-                title: const Text('Start Time'),
-                subtitle: Text(_formatDateTime(startAt)),
-                onTap: () async {
-                  final picked = await showDateTimePicker(ctx, startAt);
-                  if (picked != null) startAt = picked;
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.timer_outlined),
-                title: const Text('End Time'),
-                subtitle: Text(_formatDateTime(endAt)),
-                onTap: () async {
-                  final picked = await showDateTimePicker(ctx, endAt);
-                  if (picked != null) endAt = picked;
-                },
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.check),
-                  label: const Text('Create Rehearsal'),
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    setState(() => _isCreating = true);
-                    try {
-                      await _rehearsalRepo.createRehearsal(
-                        RehearsalInput(
-                          productionId: widget.productionId,
-                          venueId: venueController.text.trim(),
-                          startAt: startAt,
-                          endAt: endAt,
-                          participantIds: [],
-                        ),
-                      );
-                    } catch (e) {
-                      if (mounted) {
-                        setState(() => _errorMsg = e.toString());
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() => _isCreating = false);
-                      }
-                    }
-                  },
-                ),
-              ),
-            ],
+  Future<void> _showAddRehearsalSheet() async {
+    setState(() => _isCreating = true);
+    try {
+      final authService = FirebaseAuthService();
+      final user = await authService.currentUser();
+      if (!mounted) return;
+      if (user != null) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RehearsalCreationScreen(
+              user: user,
+              initialProductionId: widget.productionId,
+            ),
           ),
-        ),
-      ),
-    );
-  }
-
-  String _formatDateTime(DateTime dt) {
-    return '${_dayAbbrev(dt)}, ${dt.day} ${_monthAbbrev(dt.month)} · '
-        '${_padTime(dt.hour)}:${_padTime(dt.minute)}';
-  }
-
-  String _dayAbbrev(DateTime dt) =>
-      ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-          [dt.weekday - 1];
-
-  String _monthAbbrev(int month) => [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-      ][month - 1];
-
-  String _padTime(int v) => v.toString().padLeft(2, '0');
-
-  Future<DateTime?> showDateTimePicker(
-      BuildContext context, DateTime initial) async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (date == null || !context.mounted) return null;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
-    );
-    if (time == null) return null;
-    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCreating = false);
+      }
+    }
   }
 }
 
@@ -493,8 +380,20 @@ class _DirectorRehearsalCard extends StatelessWidget {
               )
             : BorderSide.none,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RehearsalDetailScreen(
+                rehearsalId: rehearsal.rehearsalId,
+              ),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -598,8 +497,9 @@ class _DirectorRehearsalCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   String _formatShortDate(DateTime dt) {
     const months = [
