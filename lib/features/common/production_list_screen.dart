@@ -7,20 +7,25 @@ import '../../core/widgets/app_status_state.dart';
 import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../models/app_user.dart';
+import '../../models/cast_assignment.dart';
 import '../../models/production.dart';
-import '../../services/mock_data_service.dart';
+import '../../models/rehearsal.dart';
+import '../../services/production_repository.dart';
 import 'production_detail_screen.dart';
 
 /// FR-02 & Issue #13: Reusable Production List Screen.
 /// Accessible by Director and Admin users with strict role-based data scoping:
 /// - Director: sees only assigned productions.
 /// - Admin: browses all productions in theatre catalog.
+/// Depends on [ProductionRepository] interface rather than concrete mock services.
 class ProductionListScreen extends StatefulWidget {
   final AppUser user;
+  final ProductionRepository productionRepository;
 
   const ProductionListScreen({
     super.key,
     required this.user,
+    required this.productionRepository,
   });
 
   @override
@@ -28,7 +33,6 @@ class ProductionListScreen extends StatefulWidget {
 }
 
 class _ProductionListScreenState extends State<ProductionListScreen> {
-  final MockDataService _dataService = MockDataService();
   ProductionStatus? _selectedFilter;
 
   Color _getStatusColor(ProductionStatus status) {
@@ -140,7 +144,8 @@ class _ProductionListScreenState extends State<ProductionListScreen> {
                     DropdownButtonFormField<ProductionStatus>(
                       initialValue: selectedStatus,
                       decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                       items: const [
                         DropdownMenuItem(
@@ -170,8 +175,8 @@ class _ProductionListScreenState extends State<ProductionListScreen> {
                         if (formKey.currentState!.validate()) {
                           final messenger = ScaffoldMessenger.of(context);
                           final now = DateTime.now();
-                          await _dataService.createProduction(
-                            input: ProductionInput(
+                          await widget.productionRepository.createProduction(
+                            ProductionInput(
                               name: titleController.text.trim(),
                               description: descController.text.trim(),
                               startDate: now,
@@ -207,11 +212,6 @@ class _ProductionListScreenState extends State<ProductionListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allForUser = _dataService.getProductionsForUserSync(widget.user);
-    final filtered = _selectedFilter == null
-        ? allForUser
-        : allForUser.where((p) => p.status == _selectedFilter).toList();
-
     final isDirector = widget.user.role == UserRole.director;
 
     return Scaffold(
@@ -226,33 +226,60 @@ class _ProductionListScreenState extends State<ProductionListScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Filter Chips
-          _buildFilterBar(),
+      body: StreamBuilder<List<Production>>(
+        stream: widget.productionRepository.watchProductions(
+          userId: widget.user.userId,
+          role: widget.user.role,
+        ),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: AppStatusState.error(
+                title: 'Error Loading Productions',
+                message: snapshot.error.toString(),
+                actionLabel: 'Retry',
+                onAction: () => setState(() {}),
+              ),
+            );
+          }
 
-          // List or Empty State
-          Expanded(
-            child: filtered.isEmpty
-                ? AppStatusState.empty(
-                    title: 'No Productions Found',
-                    message: isDirector
-                        ? 'You currently have no assigned productions matching this filter.'
-                        : 'No productions registered under this status category.',
-                    actionLabel: 'Create Production',
-                    onAction: _openCreateProductionSheet,
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(RevoSpacing.lg),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final prod = filtered[index];
-                      return _buildProductionCard(prod);
-                    },
-                  ),
-          ),
-        ],
+          final allForUser = snapshot.data ?? [];
+          final filtered = _selectedFilter == null
+              ? allForUser
+              : allForUser.where((p) => p.status == _selectedFilter).toList();
+
+          return Column(
+            children: [
+              // Filter Chips
+              _buildFilterBar(),
+
+              // List or Empty State
+              Expanded(
+                child: filtered.isEmpty
+                    ? AppStatusState.empty(
+                        title: 'No Productions Found',
+                        message: isDirector
+                            ? 'You currently have no assigned productions matching this filter.'
+                            : 'No productions registered under this status category.',
+                        actionLabel: 'Create Production',
+                        onAction: _openCreateProductionSheet,
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(RevoSpacing.lg),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final prod = filtered[index];
+                          return _buildProductionCard(prod);
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: RevoColors.primary,
@@ -301,8 +328,6 @@ class _ProductionListScreenState extends State<ProductionListScreen> {
 
   Widget _buildProductionCard(Production prod) {
     final statusColor = _getStatusColor(prod.status);
-    final castAssignments = _dataService.getCastAssignmentsForProduction(prod.productionId);
-    final rehearsals = _dataService.getRehearsalsForProduction(prod.productionId);
 
     return InkWell(
       borderRadius: RevoSpacing.borderRadiusCard,
@@ -313,6 +338,7 @@ class _ProductionListScreenState extends State<ProductionListScreen> {
             builder: (_) => ProductionDetailScreen(
               production: prod,
               user: widget.user,
+              productionRepository: widget.productionRepository,
             ),
           ),
         ).then((_) => setState(() {}));
@@ -381,14 +407,26 @@ class _ProductionListScreenState extends State<ProductionListScreen> {
             // Metadata Row: Cast Count + Rehearsals Count + Arrow
             Row(
               children: [
-                _metaPill(
-                  icon: Icons.groups_outlined,
-                  text: '${castAssignments.length} Cast',
+                FutureBuilder<List<CastAssignment>>(
+                  future: widget.productionRepository.getCastAssignmentsForProduction(prod.productionId),
+                  builder: (context, snap) {
+                    final count = snap.data?.length ?? 0;
+                    return _metaPill(
+                      icon: Icons.groups_outlined,
+                      text: '$count Cast',
+                    );
+                  },
                 ),
                 const SizedBox(width: 8),
-                _metaPill(
-                  icon: Icons.event_note_outlined,
-                  text: '${rehearsals.length} Rehearsals',
+                FutureBuilder<List<Rehearsal>>(
+                  future: widget.productionRepository.getRehearsalsForProduction(prod.productionId),
+                  builder: (context, snap) {
+                    final count = snap.data?.length ?? 0;
+                    return _metaPill(
+                      icon: Icons.event_note_outlined,
+                      text: '$count Rehearsals',
+                    );
+                  },
                 ),
                 const Spacer(),
                 const Icon(

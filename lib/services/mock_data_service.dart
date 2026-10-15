@@ -257,6 +257,11 @@ class MockDataService {
 
   // ── Production Operations ──────────────────────────────────────────────────
 
+  /// Returns stream of all theatre productions.
+  Stream<List<Production>> watchProductions() {
+    return _productionsStreamController.stream;
+  }
+
   /// Returns reactive stream of productions scoped to the user role:
   /// - Director: sees only productions where `directorId == user.userId`
   /// - Admin: sees all theatre productions
@@ -548,5 +553,6 @@ class MockDataService {
     _castAssignments.clear();
     _interviewRecord = DirectorInterviewRecord.emptyTemplate();
     _seedInitialData();
+    _notifyAll();
   }
 }

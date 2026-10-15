@@ -7,6 +7,10 @@ import '../../models/app_user.dart';
 import '../../models/production.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/mock_data_service.dart';
+import '../../services/mock_production_repository.dart';
+import '../../services/mock_venue_repository.dart';
+import '../../services/production_repository.dart';
+import '../../services/venue_repository.dart';
 import '../common/conflict_resolution_screen.dart';
 import '../common/production_detail_screen.dart';
 import '../common/production_list_screen.dart';
@@ -24,12 +28,16 @@ class DirectorDashboard extends StatefulWidget {
   final AppUser user;
   final VoidCallback? onNavigateToAuditions;
   final VoidCallback? onNavigateToRoles;
+  final ProductionRepository? productionRepository;
+  final VenueRepository? venueRepository;
 
   const DirectorDashboard({
     super.key,
     required this.user,
     this.onNavigateToAuditions,
     this.onNavigateToRoles,
+    this.productionRepository,
+    this.venueRepository,
   });
 
   @override
@@ -38,6 +46,16 @@ class DirectorDashboard extends StatefulWidget {
 
 class _DirectorDashboardState extends State<DirectorDashboard> {
   final MockDataService _dataService = MockDataService();
+  late final ProductionRepository _productionRepository;
+  late final VenueRepository _venueRepository;
+
+  @override
+  void initState() {
+    super.initState();
+    _productionRepository =
+        widget.productionRepository ?? MockProductionRepository();
+    _venueRepository = widget.venueRepository ?? MockVenueRepository();
+  }
 
   String _formatDate(DateTime dt) {
     const months = [
@@ -226,8 +244,10 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              ProductionListScreen(user: widget.user),
+                          builder: (context) => ProductionListScreen(
+                            user: widget.user,
+                            productionRepository: _productionRepository,
+                          ),
                         ),
                       ).then((_) => setState(() {}));
                     },
@@ -248,6 +268,8 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                         builder: (context) => ProductionDetailScreen(
                           production: primaryProd,
                           user: widget.user,
+                          productionRepository: _productionRepository,
+                          venueRepository: _venueRepository,
                         ),
                       ),
                     ).then((_) => setState(() {}));
@@ -355,12 +377,16 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                     'Upcoming Rehearsals',
                     style: RevoTypography.title2.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  Text(
-                    '${upcomingRehearsals.length} scheduled',
-                    style: RevoTypography.caption.copyWith(
-                      color: RevoColors.textMuted,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        '${upcomingRehearsals.length} scheduled',
+                        style: RevoTypography.caption.copyWith(
+                          color: RevoColors.textMuted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -399,63 +425,65 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                         borderRadius: RevoSpacing.borderRadiusCard,
                         border: Border.all(color: RevoColors.borderDefault),
                       ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 18,
-                            backgroundColor: RevoColors.primary.withValues(alpha: 0.12),
-                            child: const Icon(Icons.event_note, size: 18, color: RevoColors.primary),
-                          ),
-                          const SizedBox(width: RevoSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        prod?.name ?? 'Assigned Production',
-                                        style: RevoTypography.bodyMedium.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Text(
-                                      reh.status.name.toUpperCase(),
-                                      style: RevoTypography.caption.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: RevoColors.primary,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${_formatDate(reh.startAt)} · ${_formatTime(reh.startAt)} – ${_formatTime(reh.endAt)}',
-                                  style: RevoTypography.caption.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: RevoColors.textPrimary,
-                                  ),
-                                ),
-                                Text(
-                                  venue != null ? '${venue.name} (${venue.location})' : 'Venue TBD',
-                                  style: RevoTypography.caption.copyWith(
-                                    color: RevoColors.textSecondary,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: RevoColors.primary.withValues(alpha: 0.12),
+                              child: const Icon(Icons.event_note, size: 18, color: RevoColors.primary),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                            const SizedBox(width: RevoSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          prod?.name ?? 'Assigned Production',
+                                          style: RevoTypography.bodyMedium.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Text(
+                                        reh.status.name.toUpperCase(),
+                                        style: RevoTypography.caption.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          color: RevoColors.primary,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${_formatDate(reh.startAt)} · ${_formatTime(reh.startAt)} – ${_formatTime(reh.endAt)}',
+                                    style: RevoTypography.caption.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: RevoColors.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    venue != null ? '${venue.name} (${venue.location})' : 'Venue TBD',
+                                    style: RevoTypography.caption.copyWith(
+                                      color: RevoColors.textSecondary,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: RevoSpacing.xs),
+                            const Icon(Icons.chevron_right, size: 18, color: RevoColors.textMuted),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
               const SizedBox(height: RevoSpacing.xl),
 
               // Conflict Awareness Card

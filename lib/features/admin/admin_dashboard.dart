@@ -6,6 +6,10 @@ import '../../core/enums/revo_enums.dart';
 import '../../models/app_user.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/mock_data_service.dart';
+import '../../services/mock_production_repository.dart';
+import '../../services/mock_venue_repository.dart';
+import '../../services/production_repository.dart';
+import '../../services/venue_repository.dart';
 import '../common/production_list_screen.dart';
 import '../director/director_interview_screen.dart';
 import '../profile/screens/profile_screen.dart';
@@ -17,10 +21,14 @@ import 'venue_management_screen.dart';
 /// and PRD baseline evidence recording.
 class AdminDashboard extends StatefulWidget {
   final AppUser user;
+  final ProductionRepository? productionRepository;
+  final VenueRepository? venueRepository;
 
   const AdminDashboard({
     super.key,
     required this.user,
+    this.productionRepository,
+    this.venueRepository,
   });
 
   @override
@@ -29,6 +37,16 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final MockDataService _dataService = MockDataService();
+  late final ProductionRepository _productionRepository;
+  late final VenueRepository _venueRepository;
+
+  @override
+  void initState() {
+    super.initState();
+    _productionRepository =
+        widget.productionRepository ?? MockProductionRepository();
+    _venueRepository = widget.venueRepository ?? MockVenueRepository();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -217,8 +235,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) =>
-                                ProductionListScreen(user: widget.user),
+                            builder: (context) => ProductionListScreen(
+                              user: widget.user,
+                              productionRepository: _productionRepository,
+                            ),
                           ),
                         ).then((_) => setState(() {}));
                       },
@@ -236,8 +256,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) =>
-                                VenueManagementScreen(user: widget.user),
+                            builder: (context) => VenueManagementScreen(
+                              user: widget.user,
+                              venueRepository: _venueRepository,
+                            ),
                           ),
                         ).then((_) => setState(() {}));
                       },
@@ -289,8 +311,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          ProductionListScreen(user: widget.user),
+                      builder: (context) => ProductionListScreen(
+                        user: widget.user,
+                        productionRepository: _productionRepository,
+                      ),
                     ),
                   ).then((_) => setState(() {}));
                 },
@@ -308,8 +332,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          VenueManagementScreen(user: widget.user),
+                      builder: (context) => VenueManagementScreen(
+                        user: widget.user,
+                        venueRepository: _venueRepository,
+                      ),
                     ),
                   ).then((_) => setState(() {}));
                 },

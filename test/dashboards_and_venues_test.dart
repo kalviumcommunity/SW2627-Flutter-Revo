@@ -10,8 +10,15 @@ import 'package:sw2627_flutter_revo_1/features/director/director_dashboard.dart'
 import 'package:sw2627_flutter_revo_1/features/director/director_interview_screen.dart';
 import 'package:sw2627_flutter_revo_1/models/app_user.dart';
 import 'package:sw2627_flutter_revo_1/services/mock_data_service.dart';
+import 'package:sw2627_flutter_revo_1/services/mock_production_repository.dart';
+import 'package:sw2627_flutter_revo_1/services/mock_venue_repository.dart';
+import 'package:sw2627_flutter_revo_1/services/production_repository.dart';
+import 'package:sw2627_flutter_revo_1/services/venue_repository.dart';
 
 void main() {
+  late ProductionRepository productionRepository;
+  late VenueRepository venueRepository;
+
   final directorUser = AppUser(
     userId: 'usr_dir_101',
     name: 'Sarah Jenkins',
@@ -37,6 +44,8 @@ void main() {
 
   setUp(() {
     MockDataService().reset();
+    productionRepository = MockProductionRepository();
+    venueRepository = MockVenueRepository();
   });
 
   group('AdminDashboard Widget Tests (Issue #13)', () {
@@ -80,7 +89,12 @@ void main() {
 
   group('ProductionListScreen Widget Tests (Issue #13)', () {
     testWidgets('Director sees only their assigned productions', (tester) async {
-      await tester.pumpWidget(createTestWidget(ProductionListScreen(user: directorUser)));
+      await tester.pumpWidget(createTestWidget(
+        ProductionListScreen(
+          user: directorUser,
+          productionRepository: productionRepository,
+        ),
+      ));
       await tester.pumpAndSettle();
 
       expect(find.text('The Crucible'), findsOneWidget);
@@ -90,7 +104,12 @@ void main() {
     });
 
     testWidgets('Admin browses all productions in theatre catalog', (tester) async {
-      await tester.pumpWidget(createTestWidget(ProductionListScreen(user: adminUser)));
+      await tester.pumpWidget(createTestWidget(
+        ProductionListScreen(
+          user: adminUser,
+          productionRepository: productionRepository,
+        ),
+      ));
       await tester.pumpAndSettle();
 
       expect(find.text('The Crucible'), findsOneWidget);
@@ -107,11 +126,17 @@ void main() {
 
   group('ProductionDetailScreen Widget Tests (Issue #13)', () {
     testWidgets('Displays production details, cast assignments, and rehearsals', (tester) async {
-      final crucible = MockDataService().getProductionById('prod_101')!;
+      final crucible = await productionRepository.getProduction('prod_101');
+      expect(crucible, isNotNull);
 
       await tester.pumpWidget(
         createTestWidget(
-          ProductionDetailScreen(production: crucible, user: directorUser),
+          ProductionDetailScreen(
+            production: crucible!,
+            user: directorUser,
+            productionRepository: productionRepository,
+            venueRepository: venueRepository,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -133,7 +158,12 @@ void main() {
 
   group('VenueManagementScreen Widget Tests (Issue #13)', () {
     testWidgets('Displays venue catalog with capacity and status', (tester) async {
-      await tester.pumpWidget(createTestWidget(VenueManagementScreen(user: adminUser)));
+      await tester.pumpWidget(createTestWidget(
+        VenueManagementScreen(
+          user: adminUser,
+          venueRepository: venueRepository,
+        ),
+      ));
       await tester.pumpAndSettle();
 
       expect(find.text('Venue Catalog & Management'), findsOneWidget);
