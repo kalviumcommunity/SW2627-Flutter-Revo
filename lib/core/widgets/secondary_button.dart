@@ -40,7 +40,7 @@ class SecondaryButton extends StatelessWidget {
             foregroundColor: effectiveColor,
             disabledForegroundColor: RevoColors.textTertiary,
             side: BorderSide(
-              color: isInteractive ? RevoColors.surfaceDim : RevoColors.surfaceDim.withOpacity(0.5),
+              color: isInteractive ? RevoColors.surfaceDim : RevoColors.surfaceDim.withValues(alpha: 0.5),
               width: 1.5,
             ),
             shape: const RoundedRectangleBorder(
@@ -56,11 +56,15 @@ class SecondaryButton extends StatelessWidget {
                 Icon(icon, size: 18, color: isInteractive ? effectiveColor : RevoColors.textTertiary),
                 const SizedBox(width: 8),
               ],
-              Text(
-                label,
-                style: RevoTypography.headline.copyWith(
-                  color: isInteractive ? effectiveColor : RevoColors.textTertiary,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: RevoTypography.headline.copyWith(
+                    color: isInteractive ? effectiveColor : RevoColors.textTertiary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -91,11 +95,15 @@ class SecondaryButton extends StatelessWidget {
               Icon(icon, size: 18, color: isInteractive ? effectiveColor : RevoColors.textTertiary),
               const SizedBox(width: 8),
             ],
-            Text(
-              label,
-              style: RevoTypography.headline.copyWith(
-                color: isInteractive ? effectiveColor : RevoColors.textTertiary,
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: RevoTypography.headline.copyWith(
+                  color: isInteractive ? effectiveColor : RevoColors.textTertiary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

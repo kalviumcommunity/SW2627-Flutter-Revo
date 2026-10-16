@@ -68,8 +68,9 @@ class MockAuthService implements AuthService {
   }
 
   @override
-  Stream<AppUser?> authStateChanges() {
-    return _authStreamController.stream;
+  Stream<AppUser?> authStateChanges() async* {
+    yield _currentUser;
+    yield* _authStreamController.stream;
   }
 
   @override

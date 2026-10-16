@@ -67,11 +67,15 @@ class PrimaryButton extends StatelessWidget {
                       Icon(icon, size: 18, color: effectiveTextColor),
                       const SizedBox(width: 8),
                     ],
-                    Text(
-                      label,
-                      style: RevoTypography.headline.copyWith(
-                        color: effectiveTextColor,
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: RevoTypography.headline.copyWith(
+                          color: effectiveTextColor,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],

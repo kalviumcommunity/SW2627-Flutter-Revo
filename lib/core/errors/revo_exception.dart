@@ -2,6 +2,7 @@ import '../enums/revo_enums.dart';
 
 enum RevoErrorCode {
   unauthenticated,
+  unauthorized,
   permissionDenied,
   notFound,
   invalidInput,

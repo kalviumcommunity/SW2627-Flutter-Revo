@@ -154,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: RevoColors.errorSurface,
                                 borderRadius: RevoSpacing.borderRadiusButton,
                                 border: Border.all(
-                                  color: RevoColors.errorCrimson.withOpacity(0.3),
+                                  color: RevoColors.errorCrimson.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -260,11 +260,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: RevoColors.primary,
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                'Mock Demo Accounts (Quick Fill):',
-                                style: RevoTypography.captionBadge.copyWith(
-                                  color: RevoColors.textPrimary,
-                                  fontWeight: FontWeight.w700,
+                              Expanded(
+                                child: Text(
+                                  'Mock Demo Accounts (Quick Fill):',
+                                  style: RevoTypography.captionBadge.copyWith(
+                                    color: RevoColors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ],
@@ -297,8 +299,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 20),
 
                     // Register Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           "Don't have an account yet?",
