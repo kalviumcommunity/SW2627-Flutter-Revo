@@ -14,10 +14,12 @@ import '../../services/venue_repository.dart';
 import '../common/conflict_resolution_screen.dart';
 import '../common/production_detail_screen.dart';
 import '../common/production_list_screen.dart';
+import '../common/rehearsal_detail_screen.dart';
 import '../profile/screens/profile_screen.dart';
 import 'director_audition_management_screen.dart';
 import 'director_interview_screen.dart';
 import 'director_production_schedule_screen.dart';
+import 'rehearsal_creation_screen.dart';
 import 'role_cast_assignment_screen.dart';
 
 /// FR-02, FR-09, FR-10 & Issue #13: Director Portal Dashboard.
@@ -386,6 +388,23 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      const SizedBox(width: RevoSpacing.xs),
+                      TextButton.icon(
+                        key: const Key('director_dashboard_create_rehearsal_btn'),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => RehearsalCreationScreen(user: widget.user),
+                            ),
+                          ).then((_) => setState(() {}));
+                        },
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('Create'),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -418,72 +437,87 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                     final prod = _dataService.getProductionById(reh.productionId);
                     final venue = _dataService.getVenueById(reh.venueId);
 
-                    return Container(
-                      padding: const EdgeInsets.all(RevoSpacing.md),
-                      decoration: BoxDecoration(
-                        color: RevoColors.cardBackground,
+                    return Material(
+                      color: RevoColors.cardBackground,
+                      shape: RoundedRectangleBorder(
                         borderRadius: RevoSpacing.borderRadiusCard,
-                        border: Border.all(color: RevoColors.borderDefault),
+                        side: const BorderSide(color: RevoColors.borderDefault),
                       ),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundColor: RevoColors.primary.withValues(alpha: 0.12),
-                              child: const Icon(Icons.event_note, size: 18, color: RevoColors.primary),
-                            ),
-                            const SizedBox(width: RevoSpacing.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          prod?.name ?? 'Assigned Production',
-                                          style: RevoTypography.bodyMedium.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      Text(
-                                        reh.status.name.toUpperCase(),
-                                        style: RevoTypography.caption.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                          color: RevoColors.primary,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${_formatDate(reh.startAt)} · ${_formatTime(reh.startAt)} – ${_formatTime(reh.endAt)}',
-                                    style: RevoTypography.caption.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: RevoColors.textPrimary,
-                                    ),
-                                  ),
-                                  Text(
-                                    venue != null ? '${venue.name} (${venue.location})' : 'Venue TBD',
-                                    style: RevoTypography.caption.copyWith(
-                                      color: RevoColors.textSecondary,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
+                      child: InkWell(
+                        borderRadius: RevoSpacing.borderRadiusCard,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => RehearsalDetailScreen(
+                                rehearsalId: reh.rehearsalId,
+                                user: widget.user,
                               ),
                             ),
-                            const SizedBox(width: RevoSpacing.xs),
-                            const Icon(Icons.chevron_right, size: 18, color: RevoColors.textMuted),
-                          ],
+                          ).then((_) => setState(() {}));
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(RevoSpacing.md),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: RevoColors.primary.withValues(alpha: 0.12),
+                                child: const Icon(Icons.event_note, size: 18, color: RevoColors.primary),
+                              ),
+                              const SizedBox(width: RevoSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            prod?.name ?? 'Assigned Production',
+                                            style: RevoTypography.bodyMedium.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        Text(
+                                          reh.status.name.toUpperCase(),
+                                          style: RevoTypography.caption.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            color: RevoColors.primary,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${_formatDate(reh.startAt)} · ${_formatTime(reh.startAt)} – ${_formatTime(reh.endAt)}',
+                                      style: RevoTypography.caption.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: RevoColors.textPrimary,
+                                      ),
+                                    ),
+                                    Text(
+                                      venue != null ? '${venue.name} (${venue.location})' : 'Venue TBD',
+                                      style: RevoTypography.caption.copyWith(
+                                        color: RevoColors.textSecondary,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: RevoSpacing.xs),
+                              const Icon(Icons.chevron_right, size: 18, color: RevoColors.textMuted),
+                            ],
+                          ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
+                ),
               const SizedBox(height: RevoSpacing.xl),
 
               // Conflict Awareness Card

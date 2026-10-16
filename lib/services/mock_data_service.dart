@@ -7,6 +7,7 @@ import '../models/production.dart';
 import '../models/production_role.dart';
 import '../models/rehearsal.dart';
 import '../models/venue.dart';
+import 'rehearsal_repository.dart';
 
 /// Centralized Mock Data Service for Revo Theatre Production Management System.
 /// Maintains realistic fictional entities with cross-referential integrity,
@@ -204,6 +205,8 @@ class MockDataService {
         createdBy: 'usr_dir_101',
         createdAt: now.subtract(const Duration(days: 3)),
         updatedAt: now.subtract(const Duration(days: 1)),
+        title: 'Act I Blocking & Movement',
+        notes: 'Review opening courtroom choreography and entrance timing.',
       ),
       Rehearsal(
         rehearsalId: 'reh_102',
@@ -217,6 +220,8 @@ class MockDataService {
         createdBy: 'usr_dir_101',
         createdAt: now.subtract(const Duration(days: 2)),
         updatedAt: now.subtract(const Duration(days: 1)),
+        title: 'Act II Monologues & Blocking',
+        notes: 'Full stage run with props and stage lighting checks.',
       ),
       Rehearsal(
         rehearsalId: 'reh_103',
@@ -230,6 +235,7 @@ class MockDataService {
         createdBy: 'usr_dir_101',
         createdAt: now.subtract(const Duration(days: 1)),
         updatedAt: now.subtract(const Duration(days: 1)),
+        title: 'Puck Solo Character Study',
       ),
       Rehearsal(
         rehearsalId: 'reh_104',
@@ -243,6 +249,21 @@ class MockDataService {
         createdBy: 'usr_dir_102',
         createdAt: now.subtract(const Duration(days: 1)),
         updatedAt: now.subtract(const Duration(days: 1)),
+        title: 'Ensemble First Read-Through',
+      ),
+      Rehearsal(
+        rehearsalId: 'reh_105_cancelled',
+        productionId: 'prod_101',
+        venueId: 'ven_101', // Main Stage
+        startAt: now.add(const Duration(days: 2, hours: 2)),
+        endAt: now.add(const Duration(days: 2, hours: 5)),
+        participantIds: ['usr_cast_201'],
+        status: RehearsalStatus.cancelled,
+        clientPending: false,
+        createdBy: 'usr_dir_101',
+        createdAt: now.subtract(const Duration(days: 4)),
+        updatedAt: now.subtract(const Duration(days: 2)),
+        title: 'Cancelled Stage Blocking Session',
       ),
     ]);
 
@@ -387,6 +408,82 @@ class MockDataService {
   }
 
   // ── Rehearsal & Related Operations ─────────────────────────────────────────
+
+  Stream<List<Rehearsal>> watchRehearsals() {
+    return _rehearsalsStreamController.stream;
+  }
+
+  List<Rehearsal> getAllRehearsals() {
+    return List.unmodifiable(_rehearsals);
+  }
+
+  Rehearsal? getRehearsalById(String id) {
+    try {
+      return _rehearsals.firstWhere((r) => r.rehearsalId == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Rehearsal> createRehearsal({
+    required RehearsalInput input,
+    required String createdBy,
+    RehearsalStatus status = RehearsalStatus.confirmed,
+  }) async {
+    final now = DateTime.now();
+    final newId = 'reh_${now.millisecondsSinceEpoch}';
+    final rehearsal = Rehearsal(
+      rehearsalId: newId,
+      productionId: input.productionId,
+      venueId: input.venueId,
+      startAt: input.startAt,
+      endAt: input.endAt,
+      participantIds: List.from(input.participantIds),
+      status: status,
+      clientPending: false,
+      createdBy: createdBy,
+      createdAt: now,
+      updatedAt: now,
+      title: input.title,
+      notes: input.notes,
+    );
+    _rehearsals.add(rehearsal);
+    _notifyAll();
+    return rehearsal;
+  }
+
+  Future<void> updateRehearsal(Rehearsal rehearsal) async {
+    final idx =
+        _rehearsals.indexWhere((r) => r.rehearsalId == rehearsal.rehearsalId);
+    if (idx != -1) {
+      _rehearsals[idx] = rehearsal;
+      _notifyAll();
+    }
+  }
+
+  Future<void> cancelRehearsal(String rehearsalId) async {
+    final idx =
+        _rehearsals.indexWhere((r) => r.rehearsalId == rehearsalId);
+    if (idx != -1) {
+      final old = _rehearsals[idx];
+      _rehearsals[idx] = Rehearsal(
+        rehearsalId: old.rehearsalId,
+        productionId: old.productionId,
+        venueId: old.venueId,
+        startAt: old.startAt,
+        endAt: old.endAt,
+        participantIds: old.participantIds,
+        status: RehearsalStatus.cancelled,
+        clientPending: old.clientPending,
+        createdBy: old.createdBy,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+        title: old.title,
+        notes: old.notes,
+      );
+      _notifyAll();
+    }
+  }
 
   List<Rehearsal> getRehearsalsForProduction(String productionId) {
     return _rehearsals
