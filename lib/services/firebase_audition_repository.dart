@@ -5,37 +5,47 @@ import '../core/enums/revo_enums.dart';
 import '../core/errors/revo_exception.dart';
 import '../models/application.dart';
 import '../models/audition.dart';
+import 'auth_identity.dart';
+import 'firebase_auth_service.dart';
 import 'audition_repository.dart';
 
 class FirebaseAuditionRepository implements AuditionRepository {
-  FirebaseAuditionRepository({FirebaseFirestore? firestore, FirebaseAuth? auth})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _auth = auth ?? FirebaseAuth.instance;
+  FirebaseAuditionRepository({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    AuthIdentityProvider? identityProvider,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _identityProvider = identityProvider ??
+           (auth != null
+               ? FirebaseAuthIdentityProvider(
+                   auth: auth,
+                   firestore: firestore ?? FirebaseFirestore.instance,
+                 )
+               : FirebaseAuthService());
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final AuthIdentityProvider _identityProvider;
   CollectionReference<Map<String, dynamic>> get _auditions =>
       _firestore.collection('auditions');
   CollectionReference<Map<String, dynamic>> get _applications =>
       _firestore.collection('applications');
 
   Future<String> _requireManager() async {
-    final user = _auth.currentUser;
-    if (user == null) {
+    final identity = await _identityProvider.currentIdentity();
+    if (identity == null || !identity.isFirebaseAuthenticated) {
       throw RevoException(
         RevoErrorCode.unauthenticated,
         'Authentication is required.',
       );
     }
-    final profile = await _firestore.collection('users').doc(user.uid).get();
-    final role = profile.data()?['role']?.toString().toUpperCase();
-    if (role != 'DIRECTOR' && role != 'ADMIN') {
+    if (identity.role != UserRole.director &&
+        identity.role != UserRole.admin) {
       throw RevoException(
         RevoErrorCode.permissionDenied,
         'Only directors or admins can manage auditions.',
       );
     }
-    return user.uid;
+    return identity.userId;
   }
 
   void _validate(AuditionInput input) {
@@ -100,8 +110,8 @@ class FirebaseAuditionRepository implements AuditionRepository {
 
   @override
   Future<Application> apply(String auditionId) async {
-    final user = _auth.currentUser;
-    if (user == null) {
+    final identity = await _identityProvider.currentIdentity();
+    if (identity == null) {
       throw RevoException(
         RevoErrorCode.unauthenticated,
         'Authentication is required.',
@@ -120,7 +130,7 @@ class FirebaseAuditionRepository implements AuditionRepository {
     }
     final existing = await _applications
         .where('auditionId', isEqualTo: auditionId)
-        .where('castMemberId', isEqualTo: user.uid)
+        .where('castMemberId', isEqualTo: identity.userId)
         .get();
     if (existing.docs.any(
       (d) => d.data()['status'] != ApplicationStatus.withdrawn.name,
@@ -134,7 +144,7 @@ class FirebaseAuditionRepository implements AuditionRepository {
     final application = Application(
       applicationId: ref.id,
       auditionId: auditionId,
-      castMemberId: user.uid,
+      castMemberId: identity.userId,
       status: ApplicationStatus.submitted,
       submittedAt: DateTime.now(),
     );
@@ -144,8 +154,8 @@ class FirebaseAuditionRepository implements AuditionRepository {
 
   @override
   Future<void> withdraw(String applicationId) async {
-    final user = _auth.currentUser;
-    if (user == null) {
+    final identity = await _identityProvider.currentIdentity();
+    if (identity == null) {
       throw RevoException(
         RevoErrorCode.unauthenticated,
         'Authentication is required.',
@@ -156,7 +166,7 @@ class FirebaseAuditionRepository implements AuditionRepository {
     if (!snapshot.exists) {
       throw RevoException(RevoErrorCode.notFound, 'Application not found.');
     }
-    if (snapshot.data()?['castMemberId'] != user.uid) {
+    if (snapshot.data()?['castMemberId'] != identity.userId) {
       throw RevoException(
         RevoErrorCode.permissionDenied,
         'Cannot withdraw another user\'s application.',
@@ -175,15 +185,21 @@ class FirebaseAuditionRepository implements AuditionRepository {
 
   @override
   Stream<List<Application>> watchMyApplications() {
-    final user = _auth.currentUser;
-    if (user == null) return Stream.value(const <Application>[]);
-    return _applications
-        .where('castMemberId', isEqualTo: user.uid)
-        .snapshots()
-        .map(
-          (s) =>
-              s.docs.map((d) => Application.fromMap(d.data(), d.id)).toList(),
-        );
+    return Stream.fromFuture(_identityProvider.currentIdentity()).asyncExpand(
+      (identity) {
+        if (identity == null) {
+          return Stream.value(const <Application>[]);
+        }
+        return _applications
+            .where('castMemberId', isEqualTo: identity.userId)
+            .snapshots()
+            .map(
+              (s) => s.docs
+                  .map((d) => Application.fromMap(d.data(), d.id))
+                  .toList(),
+            );
+      },
+    );
   }
 
   @override

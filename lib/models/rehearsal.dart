@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../core/enums/revo_enums.dart';
 
 class Rehearsal {
@@ -32,33 +34,45 @@ class Rehearsal {
       'rehearsalId': rehearsalId,
       'productionId': productionId,
       'venueId': venueId,
-      'startAt': startAt.toIso8601String(),
-      'endAt': endAt.toIso8601String(),
+      'startAt': Timestamp.fromDate(startAt),
+      'endAt': Timestamp.fromDate(endAt),
       'participantIds': participantIds,
       'status': status.name,
       'clientPending': clientPending,
       'createdBy': createdBy,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
     };
   }
 
   factory Rehearsal.fromMap(Map<String, dynamic> map, String id) {
+    DateTime parseDate(Object? value) {
+      if (value is Timestamp) {
+        return value.toDate();
+      }
+      final parsed = DateTime.tryParse(value?.toString() ?? '');
+      if (parsed == null) {
+        throw FormatException('Rehearsal date is missing or invalid.');
+      }
+      return parsed;
+    }
+
+    final status = map['status']?.toString().trim().toLowerCase();
     return Rehearsal(
       rehearsalId: id,
       productionId: map['productionId'] ?? '',
       venueId: map['venueId'] ?? '',
-      startAt: DateTime.tryParse(map['startAt'].toString()) ?? DateTime.now(),
-      endAt: DateTime.tryParse(map['endAt'].toString()) ?? DateTime.now(),
+      startAt: parseDate(map['startAt']),
+      endAt: parseDate(map['endAt']),
       participantIds: List<String>.from(map['participantIds'] ?? []),
       status: RehearsalStatus.values.firstWhere(
-        (e) => e.name == map['status'],
+        (e) => e.name == status,
         orElse: () => RehearsalStatus.proposed,
       ),
       clientPending: map['clientPending'] ?? false,
       createdBy: map['createdBy'] ?? '',
-      createdAt: DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(map['updatedAt'].toString()) ?? DateTime.now(),
+      createdAt: parseDate(map['createdAt']),
+      updatedAt: parseDate(map['updatedAt']),
     );
   }
 }

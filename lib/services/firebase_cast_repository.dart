@@ -5,15 +5,27 @@ import '../core/enums/revo_enums.dart';
 import '../core/errors/revo_exception.dart';
 import '../models/cast_assignment.dart';
 import '../models/production_role.dart';
+import 'auth_identity.dart';
+import 'firebase_auth_service.dart';
 import 'cast_repository.dart';
 
 class FirebaseCastRepository implements CastRepository {
-  FirebaseCastRepository({FirebaseFirestore? firestore, FirebaseAuth? auth})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _auth = auth ?? FirebaseAuth.instance;
+  FirebaseCastRepository({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    AuthIdentityProvider? identityProvider,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _identityProvider =
+           identityProvider ??
+           (auth != null
+               ? FirebaseAuthIdentityProvider(
+                   auth: auth,
+                   firestore: firestore ?? FirebaseFirestore.instance,
+                 )
+               : FirebaseAuthService());
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final AuthIdentityProvider _identityProvider;
 
   CollectionReference<Map<String, dynamic>> get _roles =>
       _firestore.collection('roles');
@@ -21,22 +33,20 @@ class FirebaseCastRepository implements CastRepository {
       _firestore.collection('castAssignments');
 
   Future<String> _requireManager() async {
-    final user = _auth.currentUser;
-    if (user == null) {
+    final identity = await _identityProvider.currentIdentity();
+    if (identity == null || !identity.isFirebaseAuthenticated) {
       throw RevoException(
         RevoErrorCode.unauthenticated,
         'Authentication is required.',
       );
     }
-    final profile = await _firestore.collection('users').doc(user.uid).get();
-    final role = profile.data()?['role']?.toString().toUpperCase();
-    if (role != 'DIRECTOR' && role != 'ADMIN') {
+    if (identity.role != UserRole.director && identity.role != UserRole.admin) {
       throw RevoException(
         RevoErrorCode.permissionDenied,
         'Only directors or admins can manage cast assignments.',
       );
     }
-    return user.uid;
+    return identity.userId;
   }
 
   @override
@@ -146,16 +156,20 @@ class FirebaseCastRepository implements CastRepository {
 
   @override
   Stream<List<CastAssignment>> watchMyAssignments() {
-    final user = _auth.currentUser;
-    if (user == null) return Stream.value(const <CastAssignment>[]);
-    return _assignments
-        .where('castMemberId', isEqualTo: user.uid)
-        .where('status', isEqualTo: AssignmentStatus.active.name)
-        .snapshots()
-        .map(
-          (s) => s.docs
-              .map((d) => CastAssignment.fromMap(d.data(), d.id))
-              .toList(),
-        );
+    return Stream.fromFuture(_identityProvider.currentIdentity())
+        .asyncExpand((identity) {
+          if (identity == null || !identity.isFirebaseAuthenticated) {
+            return Stream.value(const <CastAssignment>[]);
+          }
+          return _assignments
+              .where('castMemberId', isEqualTo: identity.userId)
+              .where('status', isEqualTo: AssignmentStatus.active.name)
+              .snapshots()
+              .map(
+                (s) => s.docs
+                    .map((d) => CastAssignment.fromMap(d.data(), d.id))
+                    .toList(),
+              );
+        });
   }
 }

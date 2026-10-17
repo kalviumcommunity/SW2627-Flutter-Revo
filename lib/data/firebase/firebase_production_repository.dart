@@ -4,17 +4,27 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/enums/revo_enums.dart';
 import '../../core/errors/revo_exception.dart';
 import '../../models/production.dart';
+import '../../services/auth_identity.dart';
+import '../../services/firebase_auth_service.dart';
 import '../../services/production_repository.dart';
 
 class FirebaseProductionRepository implements ProductionRepository {
   FirebaseProductionRepository({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
+    AuthIdentityProvider? identityProvider,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _auth = auth ?? FirebaseAuth.instance;
+       _identityProvider =
+           identityProvider ??
+           (auth != null
+               ? FirebaseAuthIdentityProvider(
+                   auth: auth,
+                   firestore: firestore ?? FirebaseFirestore.instance,
+                 )
+               : FirebaseAuthService());
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final AuthIdentityProvider _identityProvider;
   CollectionReference<Map<String, dynamic>> get _productions =>
       _firestore.collection('productions');
 
@@ -77,20 +87,32 @@ class FirebaseProductionRepository implements ProductionRepository {
     if (input.name.trim().isEmpty) {
       throw ArgumentError('Production name cannot be empty.');
     }
+
     if (input.endDate.isBefore(input.startDate)) {
       throw ArgumentError('End date cannot be before start date.');
     }
   }
 
-  @override
-  Future<Production> createProduction(ProductionInput input) async {
-    final user = _auth.currentUser;
-    if (user == null) {
+  Future<AuthIdentity> _requireManager() async {
+    final identity = await _identityProvider.currentIdentity();
+    if (identity == null || !identity.isFirebaseAuthenticated) {
       throw RevoException(
         RevoErrorCode.unauthenticated,
         'Authentication is required.',
       );
     }
+    if (identity.role != UserRole.director && identity.role != UserRole.admin) {
+      throw RevoException(
+        RevoErrorCode.permissionDenied,
+        'Only directors or admins can manage productions.',
+      );
+    }
+    return identity;
+  }
+
+  @override
+  Future<Production> createProduction(ProductionInput input) async {
+    final identity = await _requireManager();
     _validate(input);
     final ref = _productions.doc();
     final now = DateTime.now();
@@ -98,7 +120,7 @@ class FirebaseProductionRepository implements ProductionRepository {
       productionId: ref.id,
       name: input.name.trim(),
       description: input.description.trim(),
-      directorId: user.uid,
+      directorId: identity.userId,
       startDate: input.startDate,
       endDate: input.endDate,
       status: input.status,
@@ -134,6 +156,7 @@ class FirebaseProductionRepository implements ProductionRepository {
 
   @override
   Future<void> setStatus(String productionId, ProductionStatus status) async {
+    await _requireManager();
     final ref = _productions.doc(productionId);
     if (!(await ref.get()).exists) {
       throw RevoException(

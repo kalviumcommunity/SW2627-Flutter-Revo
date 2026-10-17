@@ -15,26 +15,40 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return userRole() == "ADMIN";
+      return userRole() == "ADMIN" || userRole() == "admin";
     }
 
     function isDirector() {
-      return userRole() == "DIRECTOR";
+      return userRole() == "DIRECTOR" || userRole() == "director";
     }
 
     function isCast() {
-      return userRole() == "CAST_MEMBER";
+      return isCastRole(userRole());
+    }
+
+    function isCastRole(role) {
+      return role == "CAST_MEMBER" ||
+        role == "cast_member" ||
+        role == "CAST" ||
+        role == "cast";
     }
 
     match /users/{uid} {
       allow read: if signedIn() &&
         (request.auth.uid == uid || isAdmin());
 
-      allow create: if isAdmin();
+      // Public registration may create only its own explicitly-cast profile.
+      // Administrators may provision other users through this trusted path.
+      allow create: if
+        (signedIn() &&
+         request.auth.uid == uid &&
+         isCastRole(request.resource.data.role)) ||
+        (isAdmin() && request.auth.uid != uid);
 
-      allow update: if isAdmin() ||
+      allow update: if
         (request.auth.uid == uid &&
-         request.resource.data.role == resource.data.role);
+         request.resource.data.role == resource.data.role) ||
+        (isAdmin() && request.auth.uid != uid);
 
       allow delete: if isAdmin();
     }

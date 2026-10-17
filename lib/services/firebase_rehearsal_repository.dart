@@ -4,37 +4,45 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/enums/revo_enums.dart';
 import '../core/errors/revo_exception.dart';
 import '../models/rehearsal.dart';
+import 'auth_identity.dart';
+import 'firebase_auth_service.dart';
 import 'rehearsal_repository.dart';
 
 class FirebaseRehearsalRepository implements RehearsalRepository {
   FirebaseRehearsalRepository({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
+    AuthIdentityProvider? identityProvider,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _auth = auth ?? FirebaseAuth.instance;
+       _identityProvider = identityProvider ??
+           (auth != null
+               ? FirebaseAuthIdentityProvider(
+                   auth: auth,
+                   firestore: firestore ?? FirebaseFirestore.instance,
+                 )
+               : FirebaseAuthService());
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final AuthIdentityProvider _identityProvider;
   CollectionReference<Map<String, dynamic>> get _rehearsals =>
       _firestore.collection('rehearsals');
 
   Future<String> _requireManager() async {
-    final user = _auth.currentUser;
-    if (user == null) {
+    final identity = await _identityProvider.currentIdentity();
+    if (identity == null || !identity.isFirebaseAuthenticated) {
       throw RevoException(
         RevoErrorCode.unauthenticated,
         'Authentication is required.',
       );
     }
-    final profile = await _firestore.collection('users').doc(user.uid).get();
-    final role = profile.data()?['role']?.toString().toUpperCase();
-    if (role != 'DIRECTOR' && role != 'ADMIN') {
+    if (identity.role != UserRole.director &&
+        identity.role != UserRole.admin) {
       throw RevoException(
         RevoErrorCode.permissionDenied,
         'Only directors or admins can manage rehearsals.',
       );
     }
-    return user.uid;
+    return identity.userId;
   }
 
   void _validate(RehearsalInput input) {
@@ -46,8 +54,14 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
     }
   }
 
-  DateTime _date(dynamic value) =>
-      value is Timestamp ? value.toDate() : DateTime.parse(value.toString());
+  DateTime _date(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    if (parsed == null) {
+      throw FormatException('Rehearsal date is missing or invalid.');
+    }
+    return parsed;
+  }
 
   Future<List<Conflict>> _conflicts(
     RehearsalInput input, {
@@ -104,12 +118,7 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
     if (data == null) {
       throw StateError('Rehearsal document ${document.id} has no data.');
     }
-    final normalized = Map<String, dynamic>.from(data)
-      ..['startAt'] = _date(data['startAt']).toIso8601String()
-      ..['endAt'] = _date(data['endAt']).toIso8601String()
-      ..['createdAt'] = _date(data['createdAt']).toIso8601String()
-      ..['updatedAt'] = _date(data['updatedAt']).toIso8601String();
-    return Rehearsal.fromMap(normalized, document.id);
+    return Rehearsal.fromMap(Map<String, dynamic>.from(data), document.id);
   }
 
   @override
@@ -182,7 +191,7 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
     }
     await ref.update({
       'status': RehearsalStatus.cancelled.name,
-      'updatedAt': DateTime.now().toIso8601String(),
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
     });
   }
 

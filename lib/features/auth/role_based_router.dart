@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../core/enums/revo_enums.dart';
 import '../../models/app_user.dart';
 import '../../services/firebase_auth_service.dart';
@@ -11,11 +12,13 @@ import 'register_screen.dart';
 class RoleBasedRouter extends StatefulWidget {
   final Widget Function(BuildContext context, AppUser user)? customDirectorView;
   final Widget Function(BuildContext context, AppUser user)? customCastView;
+  final FirebaseAuthService? authService;
 
   const RoleBasedRouter({
     super.key,
     this.customDirectorView,
     this.customCastView,
+    this.authService,
   });
 
   @override
@@ -23,7 +26,8 @@ class RoleBasedRouter extends StatefulWidget {
 }
 
 class _RoleBasedRouterState extends State<RoleBasedRouter> {
-  final FirebaseAuthService _authService = FirebaseAuthService();
+  late final FirebaseAuthService _authService =
+      widget.authService ?? FirebaseAuthService();
   bool _showRegisterScreen = false;
 
   void _toggleAuthScreen() {
@@ -37,11 +41,10 @@ class _RoleBasedRouterState extends State<RoleBasedRouter> {
     return StreamBuilder<AppUser?>(
       stream: _authService.authStateChanges(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
@@ -52,10 +55,12 @@ class _RoleBasedRouterState extends State<RoleBasedRouter> {
           if (_showRegisterScreen) {
             return RegisterScreen(
               onNavigateToLogin: _toggleAuthScreen,
+              authService: _authService,
             );
           }
           return LoginScreen(
             onNavigateToRegister: _toggleAuthScreen,
+            authService: _authService,
           );
         }
 

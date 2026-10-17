@@ -3,11 +3,13 @@ import '../../services/firebase_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onNavigateToRegister;
+  final FirebaseAuthService authService;
 
-  const LoginScreen({
+  LoginScreen({
     super.key,
     required this.onNavigateToRegister,
-  });
+    FirebaseAuthService? authService,
+  }) : authService = authService ?? FirebaseAuthService();
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -20,8 +22,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
-  final _authService = FirebaseAuthService();
-
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -31,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await _authService.login(
+      await widget.authService.login(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );

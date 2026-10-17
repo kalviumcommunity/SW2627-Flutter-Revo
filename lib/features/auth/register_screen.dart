@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+
 import '../../core/enums/revo_enums.dart';
 import '../../services/firebase_auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   final VoidCallback onNavigateToLogin;
+  final FirebaseAuthService authService;
 
-  const RegisterScreen({
+  RegisterScreen({
     super.key,
     required this.onNavigateToLogin,
-  });
+    FirebaseAuthService? authService,
+  }) : authService = authService ?? FirebaseAuthService();
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -19,11 +22,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  UserRole _selectedRole = UserRole.cast;
   bool _isLoading = false;
   String? _errorMessage;
-
-  final _authService = FirebaseAuthService();
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
@@ -34,11 +34,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      await _authService.register(
+      await widget.authService.register(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
-        role: _selectedRole,
+        role: UserRole.cast,
       );
     } catch (e) {
       setState(() {
@@ -93,7 +93,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Select your primary theatre role to configure access controls.',
+                      'New public accounts are registered as Cast members.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -173,38 +173,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Role Selection (FR-01)
-                    Text(
-                      'Select Your System Role (FR-01):',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    Card(
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.groups_outlined,
+                          color: theme.colorScheme.primary,
+                        ),
+                        title: const Text('Role: Cast'),
+                        subtitle: const Text(
+                          'Director and Admin access is provisioned separately.',
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    SegmentedButton<UserRole>(
-                      segments: const [
-                        ButtonSegment<UserRole>(
-                          value: UserRole.director,
-                          label: Text('Director'),
-                          icon: Icon(Icons.movie_creation_outlined),
-                        ),
-                        ButtonSegment<UserRole>(
-                          value: UserRole.cast,
-                          label: Text('Cast'),
-                          icon: Icon(Icons.groups_outlined),
-                        ),
-                        ButtonSegment<UserRole>(
-                          value: UserRole.admin,
-                          label: Text('Admin'),
-                          icon: Icon(Icons.admin_panel_settings_outlined),
-                        ),
-                      ],
-                      selected: {_selectedRole},
-                      onSelectionChanged: (Set<UserRole> newSelection) {
-                        setState(() {
-                          _selectedRole = newSelection.first;
-                        });
-                      },
                     ),
                     const SizedBox(height: 24),
 
@@ -225,7 +204,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             )
                           : const Text(
                               'Create Account & Sign In',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                     ),
                     const SizedBox(height: 16),

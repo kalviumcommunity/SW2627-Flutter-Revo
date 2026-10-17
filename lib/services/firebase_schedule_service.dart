@@ -1,6 +1,10 @@
 import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../core/enums/revo_enums.dart';
 import '../models/rehearsal.dart';
+import 'auth_identity.dart';
 import 'firebase_auth_service.dart';
 import 'schedule_service.dart';
 
@@ -9,84 +13,76 @@ import 'schedule_service.dart';
 class FirebaseScheduleService implements ScheduleService {
   static final FirebaseScheduleService _instance =
       FirebaseScheduleService._internal();
-  factory FirebaseScheduleService() => _instance;
-
-  FirebaseScheduleService._internal() {
-    _seedInitialData();
+  factory FirebaseScheduleService({
+    FirebaseFirestore? firestore,
+    AuthIdentityProvider? identityProvider,
+  }) {
+    if (firestore == null && identityProvider == null) {
+      return _instance;
+    }
+    return FirebaseScheduleService._internal(
+      firestore: firestore,
+      identityProvider: identityProvider,
+    );
   }
 
+  FirebaseScheduleService._internal({
+    FirebaseFirestore? firestore,
+    AuthIdentityProvider? identityProvider,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _identityProvider = identityProvider ?? FirebaseAuthService();
+
+  final FirebaseFirestore _firestore;
+  final AuthIdentityProvider _identityProvider;
   final List<Rehearsal> _rehearsals = [];
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+  _rehearsalSubscription;
   SyncState _syncState = SyncState.synced;
   DateTime? _lastSyncedAt = DateTime.now();
+  bool _disposed = false;
 
   final StreamController<List<Rehearsal>> _rehearsalsController =
       StreamController<List<Rehearsal>>.broadcast();
 
-  final FirebaseAuthService _authService = FirebaseAuthService();
-
-  void _seedInitialData() {
-    final now = DateTime.now();
-    _rehearsals.addAll([
-      Rehearsal(
-        rehearsalId: 'reh_101',
-        productionId: 'prod_1',
-        venueId: 'Studio A - Main Stage',
-        startAt: now.add(const Duration(days: 1, hours: 2)),
-        endAt: now.add(const Duration(days: 1, hours: 5)),
-        participantIds: ['cast_201', 'dir_101'],
-        status: RehearsalStatus.confirmed,
-        clientPending: false,
-        createdBy: 'dir_101',
-        createdAt: now.subtract(const Duration(days: 2)),
-        updatedAt: now.subtract(const Duration(days: 2)),
-      ),
-      Rehearsal(
-        rehearsalId: 'reh_102',
-        productionId: 'prod_1',
-        venueId: 'Studio B - Rehearsal Room',
-        startAt: now.add(const Duration(days: 3, hours: 4)),
-        endAt: now.add(const Duration(days: 3, hours: 7)),
-        participantIds: ['cast_201', 'cast_202', 'dir_101'],
-        status: RehearsalStatus.proposed,
-        clientPending: false,
-        createdBy: 'dir_101',
-        createdAt: now.subtract(const Duration(days: 1)),
-        updatedAt: now.subtract(const Duration(days: 1)),
-      ),
-      Rehearsal(
-        rehearsalId: 'reh_103',
-        productionId: 'prod_1',
-        venueId: 'Black Box Theatre',
-        startAt: now.add(const Duration(days: 5, hours: 1)),
-        endAt: now.add(const Duration(days: 5, hours: 4)),
-        participantIds: ['cast_201', 'dir_101'],
-        status: RehearsalStatus.confirmed,
-        clientPending: true,
-        createdBy: 'dir_101',
-        createdAt: now,
-        updatedAt: now,
-      ),
-      Rehearsal(
-        rehearsalId: 'reh_104_cancelled',
-        productionId: 'prod_1',
-        venueId: 'Studio C',
-        startAt: now.subtract(const Duration(days: 1)),
-        endAt: now.subtract(const Duration(days: 1, hours: -3)),
-        participantIds: ['cast_201'],
-        status: RehearsalStatus.cancelled,
-        clientPending: false,
-        createdBy: 'dir_101',
-        createdAt: now.subtract(const Duration(days: 4)),
-        updatedAt: now.subtract(const Duration(days: 1)),
-      ),
-    ]);
-
-    _notifyListeners();
-  }
-
   void _notifyListeners() {
+    if (_disposed || _rehearsalsController.isClosed) {
+      return;
+    }
     _lastSyncedAt = DateTime.now();
     _rehearsalsController.add(List.unmodifiable(_rehearsals));
+  }
+
+  void _startFirestoreListener() {
+    if (_rehearsalSubscription != null || _disposed) {
+      return;
+    }
+    _rehearsalSubscription = _firestore
+        .collection('rehearsals')
+        .snapshots()
+        .listen(
+          (snapshot) {
+            try {
+              final rehearsals = snapshot.docs
+                  .map(
+                    (document) =>
+                        Rehearsal.fromMap(document.data(), document.id),
+                  )
+                  .toList();
+              _rehearsals
+                ..clear()
+                ..addAll(rehearsals);
+              _syncState = SyncState.synced;
+              _notifyListeners();
+            } catch (_) {
+              _syncState = SyncState.stale;
+              _notifyListeners();
+            }
+          },
+          onError: (_, _) {
+            _syncState = SyncState.stale;
+            _notifyListeners();
+          },
+        );
   }
 
   void notifyDataChanged() {
@@ -96,12 +92,16 @@ class FirebaseScheduleService implements ScheduleService {
   List<Rehearsal> get rawRehearsals => List.unmodifiable(_rehearsals);
 
   void addRehearsal(Rehearsal rehearsal) {
+    if (_disposed) return;
     _rehearsals.add(rehearsal);
     _notifyListeners();
   }
 
   void updateRehearsal(Rehearsal rehearsal) {
-    final index = _rehearsals.indexWhere((r) => r.rehearsalId == rehearsal.rehearsalId);
+    if (_disposed) return;
+    final index = _rehearsals.indexWhere(
+      (r) => r.rehearsalId == rehearsal.rehearsalId,
+    );
     if (index != -1) {
       _rehearsals[index] = rehearsal;
       _notifyListeners();
@@ -109,6 +109,7 @@ class FirebaseScheduleService implements ScheduleService {
   }
 
   void cancelRehearsal(String rehearsalId) {
+    if (_disposed) return;
     final index = _rehearsals.indexWhere((r) => r.rehearsalId == rehearsalId);
     if (index != -1) {
       final existing = _rehearsals[index];
@@ -130,23 +131,26 @@ class FirebaseScheduleService implements ScheduleService {
   }
 
   void setSyncState(SyncState state) {
+    if (_disposed) return;
     _syncState = state;
     _notifyListeners();
   }
 
   @override
   Stream<ScheduleSnapshot> watchMySchedule() {
+    _startFirestoreListener();
     // Initial emission trigger via microtask so listener immediately receives current cached state
     Future.microtask(() => _notifyListeners());
 
     return _rehearsalsController.stream.asyncMap((list) async {
-      final currentUser = await _authService.currentUser();
-      final userId = currentUser?.userId ?? 'cast_201';
+      final identity = await _identityProvider.currentIdentity();
+      final userId = identity?.userId;
 
       // Chronological, cancelled excluded (FR-09 requirement)
       final filtered = list.where((r) {
         if (r.status == RehearsalStatus.cancelled) return false;
-        return r.participantIds.contains(userId) || r.createdBy == userId;
+        return userId != null &&
+            (r.participantIds.contains(userId) || r.createdBy == userId);
       }).toList();
 
       filtered.sort((a, b) => a.startAt.compareTo(b.startAt));
@@ -164,6 +168,7 @@ class FirebaseScheduleService implements ScheduleService {
 
   @override
   Stream<ScheduleSnapshot> watchProductionSchedule(String productionId) {
+    _startFirestoreListener();
     Future.microtask(() => _notifyListeners());
 
     return _rehearsalsController.stream.map((list) {
@@ -184,5 +189,12 @@ class FirebaseScheduleService implements ScheduleService {
         hasPendingWrites: hasPendingWrites,
       );
     });
+  }
+
+  Future<void> dispose() async {
+    _disposed = true;
+    await _rehearsalSubscription?.cancel();
+    _rehearsalSubscription = null;
+    await _rehearsalsController.close();
   }
 }

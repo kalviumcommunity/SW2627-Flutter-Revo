@@ -4,30 +4,39 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/enums/revo_enums.dart';
 import '../../core/errors/revo_exception.dart';
 import '../../models/venue.dart';
+import '../../services/auth_identity.dart';
+import '../../services/firebase_auth_service.dart';
 import '../../services/venue_repository.dart';
 
 class FirebaseVenueRepository implements VenueRepository {
-  FirebaseVenueRepository({FirebaseFirestore? firestore, FirebaseAuth? auth})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _auth = auth ?? FirebaseAuth.instance;
+  FirebaseVenueRepository({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    AuthIdentityProvider? identityProvider,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _identityProvider = identityProvider ??
+           (auth != null
+               ? FirebaseAuthIdentityProvider(
+                   auth: auth,
+                   firestore: firestore ?? FirebaseFirestore.instance,
+                 )
+               : FirebaseAuthService());
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final AuthIdentityProvider _identityProvider;
 
   CollectionReference<Map<String, dynamic>> get _venues =>
       _firestore.collection('venues');
 
   Future<void> _requireAdmin() async {
-    final user = _auth.currentUser;
-    if (user == null) {
+    final identity = await _identityProvider.currentIdentity();
+    if (identity == null || !identity.isFirebaseAuthenticated) {
       throw RevoException(
         RevoErrorCode.unauthenticated,
         'Authentication is required.',
       );
     }
-    final profile = await _firestore.collection('users').doc(user.uid).get();
-    final role = profile.data()?['role']?.toString().toUpperCase();
-    if (role != 'ADMIN') {
+    if (identity.role != UserRole.admin) {
       throw RevoException(
         RevoErrorCode.permissionDenied,
         'Only admins can manage venues.',
