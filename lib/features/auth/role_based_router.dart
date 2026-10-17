@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../../core/enums/revo_enums.dart';
 import '../../core/widgets/loading_indicator.dart';
 import '../../models/app_user.dart';
@@ -18,14 +17,12 @@ class RoleBasedRouter extends StatefulWidget {
   final AuthService? authService;
   final Widget Function(BuildContext context, AppUser user)? customDirectorView;
   final Widget Function(BuildContext context, AppUser user)? customCastView;
-  final FirebaseAuthService? authService;
 
   const RoleBasedRouter({
     super.key,
     this.authService,
     this.customDirectorView,
     this.customCastView,
-    this.authService,
   });
 
   @override
@@ -33,12 +30,7 @@ class RoleBasedRouter extends StatefulWidget {
 }
 
 class _RoleBasedRouterState extends State<RoleBasedRouter> {
-<<<<<<< HEAD
-  late final FirebaseAuthService _authService =
-      widget.authService ?? FirebaseAuthService();
-=======
   late final AuthService _authService;
->>>>>>> origin/development
   bool _showRegisterScreen = false;
 
   @override
@@ -58,18 +50,13 @@ class _RoleBasedRouterState extends State<RoleBasedRouter> {
     return StreamBuilder<AppUser?>(
       stream: _authService.authStateChanges(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Scaffold(
-<<<<<<< HEAD
-            body: Center(child: CircularProgressIndicator()),
-=======
             body: Center(
               child: AppLoadingIndicator.fullScreen(
                 message: 'Initializing Revo session...',
               ),
             ),
->>>>>>> origin/development
           );
         }
 
@@ -81,13 +68,11 @@ class _RoleBasedRouterState extends State<RoleBasedRouter> {
             return RegisterScreen(
               authService: _authService,
               onNavigateToLogin: _toggleAuthScreen,
-              authService: _authService,
             );
           }
           return LoginScreen(
             authService: _authService,
             onNavigateToRegister: _toggleAuthScreen,
-            authService: _authService,
           );
         }
 

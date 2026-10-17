@@ -5,12 +5,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import '../core/enums/revo_enums.dart';
+import '../core/errors/revo_exception.dart';
 import '../models/app_user.dart';
 import 'auth_identity.dart';
 import 'auth_service.dart';
-import 'mock_auth_service.dart';
 
-<<<<<<< HEAD
 /// Firebase-backed authentication. The default instance never creates a local
 /// identity; demo authentication is available only through [demo].
 class FirebaseAuthService implements AuthService, AuthIdentityProvider {
@@ -92,27 +91,10 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
       return _demoAuthController.stream;
     }
     return _auth!.authStateChanges().asyncMap(_profileForFirebaseUser);
-=======
-/// Firebase Authentication Service adapter.
-/// Currently delegates to [MockAuthService] for Issue #8 isolated mock auth
-/// workflows, and serves as the designated injection point for future
-/// production Firebase Authentication integration without touching UI screens.
-class FirebaseAuthService implements AuthService {
-  static final FirebaseAuthService _instance = FirebaseAuthService._internal();
-  factory FirebaseAuthService() => _instance;
-  FirebaseAuthService._internal();
-
-  final MockAuthService _mockAuth = MockAuthService();
-
-  @override
-  Stream<AppUser?> authStateChanges() {
-    return _mockAuth.authStateChanges();
->>>>>>> origin/development
   }
 
   @override
   Future<AppUser?> currentUser() async {
-<<<<<<< HEAD
     if (_unavailable) return null;
     if (isDemoMode) return _demoCurrentUser;
     return _profileForFirebaseUser(_auth!.currentUser);
@@ -154,9 +136,6 @@ class FirebaseAuthService implements AuthService {
       exists: profile.exists,
       data: profile.data(),
     );
-=======
-    return _mockAuth.currentUser();
->>>>>>> origin/development
   }
 
   @override
@@ -164,7 +143,6 @@ class FirebaseAuthService implements AuthService {
     required String email,
     required String password,
   }) async {
-<<<<<<< HEAD
     if (email.trim().isEmpty || password.trim().isEmpty) {
       throw RevoException(
         RevoErrorCode.invalidInput,
@@ -205,9 +183,6 @@ class FirebaseAuthService implements AuthService {
       );
     }
     return profile;
-=======
-    return _mockAuth.login(email: email, password: password);
->>>>>>> origin/development
   }
 
   @override
@@ -218,7 +193,6 @@ class FirebaseAuthService implements AuthService {
     UserRole role = UserRole.cast,
     String? adminPasscode,
   }) async {
-<<<<<<< HEAD
     if (name.trim().isEmpty ||
         email.trim().isEmpty ||
         password.trim().isEmpty) {
@@ -274,20 +248,10 @@ class FirebaseAuthService implements AuthService {
       rethrow;
     }
     return profile;
-=======
-    return _mockAuth.register(
-      name: name,
-      email: email,
-      password: password,
-      role: role,
-      adminPasscode: adminPasscode,
-    );
->>>>>>> origin/development
   }
 
   @override
   Future<void> logout() async {
-<<<<<<< HEAD
     if (_unavailable) return;
     if (isDemoMode) {
       _demoCurrentUser = null;
@@ -295,14 +259,10 @@ class FirebaseAuthService implements AuthService {
     } else {
       await _auth!.signOut();
     }
-=======
-    await _mockAuth.logout();
->>>>>>> origin/development
   }
 
   /// Demo-only role switching retained for local UI walkthroughs.
   void switchUserRole(UserRole newRole) {
-<<<<<<< HEAD
     if (!isDemoMode || _demoCurrentUser == null) return;
     final user = _demoCurrentUser!;
     _demoCurrentUser = AppUser(
@@ -313,8 +273,5 @@ class FirebaseAuthService implements AuthService {
       createdAt: user.createdAt,
     );
     _demoAuthController.add(_demoCurrentUser);
-=======
-    _mockAuth.switchUserRole(newRole);
->>>>>>> origin/development
   }
 }

@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-<<<<<<< HEAD
-
-=======
 import '../../core/constants/revo_colors.dart';
 import '../../core/constants/revo_spacing.dart';
 import '../../core/constants/revo_typography.dart';
->>>>>>> origin/development
 import '../../core/enums/revo_enums.dart';
 import '../../core/widgets/app_brand_header.dart';
 import '../../core/widgets/app_text_field.dart';
@@ -18,22 +14,13 @@ import '../../services/mock_auth_service.dart';
 /// and guarded Admin self-registration.
 class RegisterScreen extends StatefulWidget {
   final VoidCallback onNavigateToLogin;
-<<<<<<< HEAD
-  final FirebaseAuthService authService;
-=======
   final AuthService? authService;
->>>>>>> origin/development
 
-  RegisterScreen({
+  const RegisterScreen({
     super.key,
     required this.onNavigateToLogin,
-<<<<<<< HEAD
-    FirebaseAuthService? authService,
-  }) : authService = authService ?? FirebaseAuthService();
-=======
     this.authService,
   });
->>>>>>> origin/development
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -44,11 +31,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-<<<<<<< HEAD
-  bool _isLoading = false;
-  String? _errorMessage;
-
-=======
   final _confirmPasswordController = TextEditingController();
   final _adminPasscodeController = TextEditingController();
 
@@ -74,7 +56,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
->>>>>>> origin/development
   Future<void> _handleRegister() async {
     FocusScope.of(context).unfocus();
 
@@ -87,13 +68,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-<<<<<<< HEAD
-      await widget.authService.register(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-        role: UserRole.cast,
-=======
       await _auth.register(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
@@ -102,7 +76,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         adminPasscode: _selectedRole == UserRole.admin
             ? _adminPasscodeController.text.trim()
             : null,
->>>>>>> origin/development
       );
       // On success, role_based_router's stream listener automatically routes to the appropriate dashboard
     } catch (e) {
@@ -150,27 +123,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-<<<<<<< HEAD
-                    Text(
-                      'Join Revo Platform',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'New public accounts are registered as Cast members.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-=======
                     // Brand Header
                     const AppBrandHeader(
                       iconSize: 42,
                       title: 'Join Revo',
                       subtitle: 'Register your production account',
->>>>>>> origin/development
                     ),
                     const SizedBox(height: 24),
 
@@ -418,55 +375,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 20),
 
-<<<<<<< HEAD
-                    Card(
-                      child: ListTile(
-                        leading: Icon(
-                          Icons.groups_outlined,
-                          color: theme.colorScheme.primary,
-                        ),
-                        title: const Text('Role: Cast'),
-                        subtitle: const Text(
-                          'Director and Admin access is provisioned separately.',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Submit Button
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _handleRegister,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Create Account & Sign In',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Back to login
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-=======
                     // Back to Login
                     Wrap(
                       alignment: WrapAlignment.center,
                       crossAxisAlignment: WrapCrossAlignment.center,
->>>>>>> origin/development
                       children: [
                         Text(
                           'Already have an account?',

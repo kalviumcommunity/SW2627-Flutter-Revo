@@ -12,22 +12,13 @@ import '../../services/mock_auth_service.dart';
 /// Built with Revo Design System shared widgets and isolated mock authentication.
 class LoginScreen extends StatefulWidget {
   final VoidCallback onNavigateToRegister;
-<<<<<<< HEAD
-  final FirebaseAuthService authService;
-=======
   final AuthService? authService;
->>>>>>> origin/development
 
-  LoginScreen({
+  const LoginScreen({
     super.key,
     required this.onNavigateToRegister,
-<<<<<<< HEAD
-    FirebaseAuthService? authService,
-  }) : authService = authService ?? FirebaseAuthService();
-=======
     this.authService,
   });
->>>>>>> origin/development
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -41,8 +32,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
-<<<<<<< HEAD
-=======
   late final AuthService _auth;
 
   @override
@@ -66,7 +55,6 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
->>>>>>> origin/development
   Future<void> _handleLogin() async {
     // Dismiss keyboard
     FocusScope.of(context).unfocus();
@@ -80,11 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-<<<<<<< HEAD
-      await widget.authService.login(
-=======
       await _auth.login(
->>>>>>> origin/development
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );

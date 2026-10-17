@@ -45,15 +45,10 @@ class Rehearsal {
       'status': status.name,
       'clientPending': clientPending,
       'createdBy': createdBy,
-<<<<<<< HEAD
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
-=======
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
       if (title != null) 'title': title,
       if (notes != null) 'notes': notes,
->>>>>>> origin/development
     };
   }
 
@@ -83,15 +78,10 @@ class Rehearsal {
       ),
       clientPending: map['clientPending'] ?? false,
       createdBy: map['createdBy'] ?? '',
-<<<<<<< HEAD
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
-=======
-      createdAt: DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(map['updatedAt'].toString()) ?? DateTime.now(),
       title: map['title'],
       notes: map['notes'],
->>>>>>> origin/development
     );
   }
 }
