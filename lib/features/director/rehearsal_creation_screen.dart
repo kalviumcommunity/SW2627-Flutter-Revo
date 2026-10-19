@@ -21,11 +21,13 @@ import '../common/rehearsal_detail_screen.dart';
 class RehearsalCreationScreen extends StatefulWidget {
   final AppUser user;
   final String? initialProductionId;
+  final RehearsalRepository? rehearsalRepository;
 
   const RehearsalCreationScreen({
     super.key,
     required this.user,
     this.initialProductionId,
+    this.rehearsalRepository,
   });
 
   @override
@@ -36,7 +38,7 @@ class RehearsalCreationScreen extends StatefulWidget {
 class _RehearsalCreationScreenState extends State<RehearsalCreationScreen> {
   final MockDataService _dataService = MockDataService();
   final MockConflictService _conflictService = MockConflictService();
-  final MockRehearsalRepository _rehearsalRepo = MockRehearsalRepository();
+  late final RehearsalRepository _rehearsalRepo;
 
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
@@ -62,6 +64,7 @@ class _RehearsalCreationScreenState extends State<RehearsalCreationScreen> {
   @override
   void initState() {
     super.initState();
+    _rehearsalRepo = widget.rehearsalRepository ?? MockRehearsalRepository();
     _loadProductions();
   }
 
@@ -308,16 +311,23 @@ class _RehearsalCreationScreenState extends State<RehearsalCreationScreen> {
         setState(() => _isConfirming = false);
 
         if (result.confirmed && result.rehearsal != null) {
+          final isPending = result.rehearsal!.clientPending;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              backgroundColor: RevoColors.successGreen,
+              backgroundColor: isPending
+                  ? const Color(0xFF946300)
+                  : RevoColors.successGreen,
               content: Row(
                 children: [
-                  const Icon(Icons.check_circle,
-                      color: Colors.white, size: 20),
+                  Icon(
+                      isPending ? Icons.upload_outlined : Icons.check_circle,
+                      color: Colors.white,
+                      size: 20),
                   const SizedBox(width: RevoSpacing.sm),
-                  const Expanded(
-                    child: Text('Rehearsal successfully scheduled and confirmed!'),
+                  Expanded(
+                    child: Text(isPending
+                        ? 'Rehearsal saved locally (Pending sync — awaiting connection).'
+                        : 'Rehearsal successfully scheduled and confirmed!'),
                   ),
                 ],
               ),

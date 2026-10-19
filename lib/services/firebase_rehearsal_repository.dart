@@ -1,10 +1,12 @@
 import 'dart:async';
 import '../core/enums/revo_enums.dart';
 import '../core/errors/revo_exception.dart';
+import '../models/app_user.dart';
 import '../models/rehearsal.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_schedule_service.dart';
 import 'rehearsal_repository.dart';
+import 'sync_status_service.dart';
 
 /// Concrete Implementation of RehearsalRepository managing creation, modification, and cancellation of rehearsals (FR-05, FR-09, BR-08).
 class FirebaseRehearsalRepository implements RehearsalRepository {
@@ -18,14 +20,20 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
   final FirebaseScheduleService _scheduleService = FirebaseScheduleService();
 
   @override
-  Future<RehearsalSaveResult> createRehearsal(RehearsalInput input) async {
-    final currentUser = await _authService.currentUser();
+  Future<RehearsalSaveResult> createRehearsal(
+    RehearsalInput input, {
+    AppUser? user,
+  }) async {
+    final currentUser = user ?? await _authService.currentUser();
     if (currentUser == null || currentUser.role != UserRole.director) {
       throw RevoException(
         RevoErrorCode.permissionDenied,
         'Only Directors are authorized to schedule rehearsals (FR-05).',
       );
     }
+
+    final isOffline =
+        SyncStatusService.instance.connectivity == ConnectivityState.offline;
 
     final newRehearsal = Rehearsal(
       rehearsalId: 'reh_${DateTime.now().millisecondsSinceEpoch}',
@@ -35,7 +43,7 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
       endAt: input.endAt,
       participantIds: input.participantIds,
       status: RehearsalStatus.confirmed,
-      clientPending: false,
+      clientPending: isOffline,
       createdBy: currentUser.userId,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
@@ -51,14 +59,20 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
 
   @override
   Future<RehearsalSaveResult> updateRehearsal(
-      String rehearsalId, RehearsalInput input) async {
-    final currentUser = await _authService.currentUser();
+    String rehearsalId,
+    RehearsalInput input, {
+    AppUser? user,
+  }) async {
+    final currentUser = user ?? await _authService.currentUser();
     if (currentUser == null || currentUser.role != UserRole.director) {
       throw RevoException(
         RevoErrorCode.permissionDenied,
         'Only Directors are authorized to modify rehearsals.',
       );
     }
+
+    final isOffline =
+        SyncStatusService.instance.connectivity == ConnectivityState.offline;
 
     final existing = await getRehearsal(rehearsalId);
     final updated = Rehearsal(
@@ -69,7 +83,7 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
       endAt: input.endAt,
       participantIds: input.participantIds,
       status: existing.status,
-      clientPending: existing.clientPending,
+      clientPending: isOffline,
       createdBy: existing.createdBy,
       createdAt: existing.createdAt,
       updatedAt: DateTime.now(),
@@ -84,8 +98,8 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
   }
 
   @override
-  Future<void> cancelRehearsal(String rehearsalId) async {
-    final currentUser = await _authService.currentUser();
+  Future<void> cancelRehearsal(String rehearsalId, {AppUser? user}) async {
+    final currentUser = user ?? await _authService.currentUser();
     if (currentUser == null || currentUser.role != UserRole.director) {
       throw RevoException(
         RevoErrorCode.permissionDenied,

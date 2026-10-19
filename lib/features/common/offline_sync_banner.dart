@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/enums/revo_enums.dart';
 import '../../services/firebase_schedule_service.dart';
 import '../../services/firebase_notification_service.dart';
+import '../../services/sync/sync_timestamp_formatter.dart';
 
 /// FR-12 · FR-13 · FR-14: Offline Sync Banner + Reconnect Reconciliation Widget.
 ///
@@ -137,8 +138,8 @@ class _OfflineBanner extends StatelessWidget {
   const _OfflineBanner({this.lastSyncedAt, required this.pulseAnimation});
 
   String _fmtLastSynced(DateTime? dt) {
-    if (dt == null) return '—';
-    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    if (dt == null) return 'Never';
+    return SyncTimestampFormatter.format(dt);
   }
 
   @override

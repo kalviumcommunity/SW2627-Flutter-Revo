@@ -5,9 +5,11 @@ import '../models/rehearsal.dart';
 import 'auth_service.dart';
 import 'conflict_service.dart';
 import 'firebase_auth_service.dart';
+import 'firebase_schedule_service.dart';
 import 'mock_conflict_service.dart';
 import 'mock_data_service.dart';
 import 'rehearsal_repository.dart';
+import 'sync_status_service.dart';
 
 /// In-memory mock repository implementing [RehearsalRepository] (FR-05, FR-08, Issue #21).
 /// Enforces role-based permissions, cross-entity relational validation,
@@ -153,11 +155,27 @@ class MockRehearsalRepository implements RehearsalRepository {
       );
     }
 
+    final isOffline =
+        SyncStatusService.instance.connectivity == ConnectivityState.offline;
+
     final created = await _dataService.createRehearsal(
       input: input,
       createdBy: effectiveUser.userId,
       status: RehearsalStatus.confirmed,
+      clientPending: isOffline,
     );
+
+    // Keep FirebaseScheduleService in sync with created rehearsal
+    FirebaseScheduleService().addRehearsal(created);
+
+    if (isOffline) {
+      SyncStatusService.instance.queuePendingWrite(
+        entityType: 'rehearsal',
+        entityId: created.rehearsalId,
+        action: 'create',
+        payload: created.toMap(),
+      );
+    }
 
     return RehearsalSaveResult(
       rehearsal: created,
@@ -199,6 +217,9 @@ class MockRehearsalRepository implements RehearsalRepository {
       );
     }
 
+    final isOffline =
+        SyncStatusService.instance.connectivity == ConnectivityState.offline;
+
     final updated = Rehearsal(
       rehearsalId: existing.rehearsalId,
       productionId: input.productionId,
@@ -207,7 +228,7 @@ class MockRehearsalRepository implements RehearsalRepository {
       endAt: input.endAt,
       participantIds: input.participantIds,
       status: existing.status,
-      clientPending: existing.clientPending,
+      clientPending: isOffline,
       createdBy: existing.createdBy,
       createdAt: existing.createdAt,
       updatedAt: DateTime.now(),
@@ -216,6 +237,16 @@ class MockRehearsalRepository implements RehearsalRepository {
     );
 
     await _dataService.updateRehearsal(updated);
+    FirebaseScheduleService().updateRehearsal(updated);
+
+    if (isOffline) {
+      SyncStatusService.instance.queuePendingWrite(
+        entityType: 'rehearsal',
+        entityId: updated.rehearsalId,
+        action: 'update',
+        payload: updated.toMap(),
+      );
+    }
 
     return RehearsalSaveResult(
       rehearsal: updated,
@@ -235,7 +266,20 @@ class MockRehearsalRepository implements RehearsalRepository {
     final existing = await getRehearsal(rehearsalId);
     _validateProductionOwnership(effectiveUser, existing.productionId);
 
+    final isOffline =
+        SyncStatusService.instance.connectivity == ConnectivityState.offline;
+
     await _dataService.cancelRehearsal(rehearsalId);
+    FirebaseScheduleService().cancelRehearsal(rehearsalId);
+
+    if (isOffline) {
+      SyncStatusService.instance.queuePendingWrite(
+        entityType: 'rehearsal',
+        entityId: rehearsalId,
+        action: 'cancel',
+        payload: {'status': RehearsalStatus.cancelled.name},
+      );
+    }
   }
 
   @override
