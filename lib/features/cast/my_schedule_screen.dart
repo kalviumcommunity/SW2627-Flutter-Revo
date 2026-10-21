@@ -3,6 +3,7 @@ import '../../core/enums/revo_enums.dart';
 import '../../models/rehearsal.dart';
 import '../../services/firebase_schedule_service.dart';
 import '../../services/schedule_service.dart';
+import '../common/widgets/sync_status_indicators.dart';
 
 /// FR-09: Personalized chronological schedule view for Cast Members.
 /// FR-10: Real-time Firestore stream listener — UI updates instantly on any rehearsal change.
@@ -75,6 +76,9 @@ class _ScheduleBody extends StatelessWidget {
 
     final data = snapshot.data;
     if (data == null || data.items.isEmpty) {
+      if (data?.syncState == SyncState.offline) {
+        return const OfflineEmptyScheduleView();
+      }
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -105,8 +109,8 @@ class _ScheduleBody extends StatelessWidget {
 
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
-          child: _SyncStatusBanner(snapshot: data),
+        const SliverToBoxAdapter(
+          child: ComprehensiveSyncBanner(),
         ),
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -145,119 +149,6 @@ class _ScheduleBody extends StatelessWidget {
   }
 }
 
-class _SyncStatusBanner extends StatelessWidget {
-  final ScheduleSnapshot snapshot;
-
-  const _SyncStatusBanner({required this.snapshot});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    // FR-10: Visual sync state indicator
-    if (snapshot.syncState == SyncState.offline) {
-      return Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFEF8EC),
-          border: const Border(
-            left: BorderSide(color: Color(0xFFF2B33D), width: 3),
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded,
-                color: Color(0xFFF2B33D), size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Viewing Cached Schedule',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF7A5C00),
-                    ),
-                  ),
-                  if (snapshot.lastSyncedAt != null)
-                    Text(
-                      'Last synced: ${_formatTime(snapshot.lastSyncedAt!)}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF7A5C00),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (snapshot.hasPendingWrites) {
-      return Container(
-        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: theme.colorScheme.secondary,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'Syncing schedule changes…',
-              style: TextStyle(
-                fontSize: 13,
-                color: theme.colorScheme.onSecondaryContainer,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (snapshot.lastSyncedAt != null) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: Row(
-          children: [
-            Icon(Icons.wifi, size: 14, color: theme.colorScheme.primary),
-            const SizedBox(width: 6),
-            Text(
-              'Live · Synced ${_formatTime(snapshot.lastSyncedAt!)}',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.primary,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
-
-  String _formatTime(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inSeconds < 60) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    return '${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-}
 
 class _RehearsalCard extends StatelessWidget {
   final Rehearsal rehearsal;
@@ -456,20 +347,11 @@ class _RehearsalCard extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (isPending) ...[
-                          const SizedBox(width: 6),
-                          Icon(Icons.sync,
-                              size: 14,
-                              color: theme.colorScheme.secondary),
-                          const SizedBox(width: 2),
-                          Text(
-                            'Pending sync',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: theme.colorScheme.secondary,
-                            ),
-                          ),
-                        ],
+                        const SizedBox(width: 6),
+                        if (isPending)
+                          const EntitySyncBadge(status: WriteSyncStatus.pending)
+                        else
+                          const EntitySyncBadge(status: WriteSyncStatus.confirmed),
                         const Spacer(),
                         Row(
                           children: [

@@ -5,7 +5,10 @@ import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_rehearsal_repository.dart';
 import '../../services/firebase_schedule_service.dart';
 import '../../services/schedule_service.dart';
+import '../../services/sync/sync_timestamp_formatter.dart';
+import '../../services/sync_status_service.dart';
 import '../common/rehearsal_detail_screen.dart';
+import '../common/widgets/sync_status_indicators.dart';
 import 'rehearsal_creation_screen.dart';
 
 /// FR-09: Production-wide schedule view for Directors — full cast & venue overview.
@@ -42,7 +45,7 @@ class _DirectorProductionScheduleScreenState
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          children: [   
             const Text(
               'Production Schedule (FR-09, FR-10)',
               style: TextStyle(fontSize: 16),
@@ -56,21 +59,35 @@ class _DirectorProductionScheduleScreenState
           ],
         ),
         actions: [
-          // FR-10: Live badge
+          // FR-10 & FR-12: Reactive Live / Offline badge
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: Chip(
-              avatar: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.greenAccent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              label: const Text('LIVE', style: TextStyle(fontSize: 11)),
-              padding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
+            child: StreamBuilder<SyncStatusSnapshot>(
+              stream: SyncStatusService.instance.watchSnapshot(),
+              builder: (context, snapshot) {
+                final isOffline = snapshot.data?.isOffline ?? false;
+                final isStale = snapshot.data?.isStale ?? false;
+                final color = isOffline
+                    ? Colors.grey
+                    : (isStale ? Colors.amber : Colors.greenAccent);
+                final label = isOffline
+                    ? 'OFFLINE'
+                    : (isStale ? 'STALE' : 'LIVE');
+
+                return Chip(
+                  avatar: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  label: Text(label, style: const TextStyle(fontSize: 11)),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                );
+              },
             ),
           ),
         ],
@@ -101,6 +118,9 @@ class _DirectorProductionScheduleScreenState
 
                 final data = snapshot.data;
                 if (data == null || data.items.isEmpty) {
+                  if (data?.syncState == SyncState.offline) {
+                    return const OfflineEmptyScheduleView();
+                  }
                   return _EmptyProductionSchedule(
                     productionTitle: widget.productionTitle,
                   );
@@ -108,8 +128,8 @@ class _DirectorProductionScheduleScreenState
 
                 return CustomScrollView(
                   slivers: [
-                    SliverToBoxAdapter(
-                      child: _ProductionSyncBanner(data: data),
+                    const SliverToBoxAdapter(
+                      child: ComprehensiveSyncBanner(),
                     ),
                     SliverToBoxAdapter(
                       child: _ScheduleSummaryBar(data: data),
@@ -209,62 +229,6 @@ class _DirectorProductionScheduleScreenState
   }
 }
 
-class _ProductionSyncBanner extends StatelessWidget {
-  final ScheduleSnapshot data;
-
-  const _ProductionSyncBanner({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    if (data.syncState == SyncState.offline) {
-      return Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFEF8EC),
-          border:
-              const Border(left: BorderSide(color: Color(0xFFF2B33D), width: 3)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded,
-                color: Color(0xFFF2B33D), size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Offline · Displaying cached production schedule. Last synced: ${_formatLastSync(data.lastSyncedAt)}',
-                style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF7A5C00)),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        children: [
-          Icon(Icons.sensors, size: 14, color: theme.colorScheme.primary),
-          const SizedBox(width: 6),
-          Text(
-            'Real-time stream active (FR-10)',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatLastSync(DateTime? dt) {
-    if (dt == null) return 'unknown';
-    return '${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-}
 
 class _ScheduleSummaryBar extends StatelessWidget {
   final ScheduleSnapshot data;
@@ -286,30 +250,44 @@ class _ScheduleSummaryBar extends StatelessWidget {
         color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _SummaryItem(
-            icon: Icons.check_circle_outline,
-            label: 'Confirmed',
-            count: confirmed,
-            color: Colors.green.shade700,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _SummaryItem(
+                icon: Icons.check_circle_outline,
+                label: 'Confirmed',
+                count: confirmed,
+                color: Colors.green.shade700,
+              ),
+              Container(
+                  width: 1, height: 32, color: theme.colorScheme.outlineVariant),
+              _SummaryItem(
+                icon: Icons.pending_outlined,
+                label: 'Proposed',
+                count: proposed,
+                color: Colors.orange.shade700,
+              ),
+              Container(
+                  width: 1, height: 32, color: theme.colorScheme.outlineVariant),
+              _SummaryItem(
+                icon: Icons.event_note_outlined,
+                label: 'Total',
+                count: data.items.length,
+                color: theme.colorScheme.primary,
+              ),
+            ],
           ),
-          Container(
-              width: 1, height: 32, color: theme.colorScheme.outlineVariant),
-          _SummaryItem(
-            icon: Icons.pending_outlined,
-            label: 'Proposed',
-            count: proposed,
-            color: Colors.orange.shade700,
-          ),
-          Container(
-              width: 1, height: 32, color: theme.colorScheme.outlineVariant),
-          _SummaryItem(
-            icon: Icons.event_note_outlined,
-            label: 'Total',
-            count: data.items.length,
-            color: theme.colorScheme.primary,
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              SyncTimestampFormatter.formatWithPrefix(data.lastSyncedAt),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
         ],
       ),
@@ -465,19 +443,11 @@ class _DirectorRehearsalCard extends StatelessWidget {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                if (rehearsal.clientPending) ...[
-                  const SizedBox(width: 8),
-                  Icon(Icons.sync,
-                      size: 13, color: theme.colorScheme.secondary),
-                  const SizedBox(width: 3),
-                  Text(
-                    'Pending sync',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.secondary,
-                    ),
-                  ),
-                ],
+                const SizedBox(width: 8),
+                if (rehearsal.clientPending)
+                  const EntitySyncBadge(status: WriteSyncStatus.pending)
+                else
+                  const EntitySyncBadge(status: WriteSyncStatus.confirmed),
               ],
             ),
             const SizedBox(height: 12),

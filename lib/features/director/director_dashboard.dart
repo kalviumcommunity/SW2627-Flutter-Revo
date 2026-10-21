@@ -15,6 +15,7 @@ import '../common/conflict_resolution_screen.dart';
 import '../common/production_detail_screen.dart';
 import '../common/production_list_screen.dart';
 import '../common/rehearsal_detail_screen.dart';
+import '../common/widgets/sync_status_indicators.dart';
 import '../profile/screens/profile_screen.dart';
 import 'director_audition_management_screen.dart';
 import 'director_interview_screen.dart';
@@ -151,17 +152,21 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {});
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(RevoSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // User Greeting Banner
+      body: Column(
+        children: [
+          const ComprehensiveSyncBanner(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                setState(() {});
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(RevoSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // User Greeting Banner
               Container(
                 padding: const EdgeInsets.all(RevoSpacing.lg),
                 decoration: BoxDecoration(
@@ -231,6 +236,10 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                   ],
                 ),
               ),
+              const SizedBox(height: RevoSpacing.lg),
+
+              // FR-12 / FR-13: Synchronization Status Card
+              const SyncStatusCard(),
               const SizedBox(height: RevoSpacing.xl),
 
               // Production Overview Section (FR-02)
@@ -690,6 +699,9 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
           ),
         ),
       ),
+    ),
+  ],
+),
     );
   }
 

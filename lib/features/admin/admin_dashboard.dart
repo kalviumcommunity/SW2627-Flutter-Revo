@@ -11,6 +11,7 @@ import '../../services/mock_venue_repository.dart';
 import '../../services/production_repository.dart';
 import '../../services/venue_repository.dart';
 import '../common/production_list_screen.dart';
+import '../common/widgets/sync_status_indicators.dart';
 import '../director/director_interview_screen.dart';
 import '../profile/screens/profile_screen.dart';
 import 'venue_management_screen.dart';
@@ -120,17 +121,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {});
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(RevoSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // User Greeting Banner
+      body: Column(
+        children: [
+          const ComprehensiveSyncBanner(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                setState(() {});
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(RevoSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // User Greeting Banner
               Container(
                 padding: const EdgeInsets.all(RevoSpacing.lg),
                 decoration: BoxDecoration(
@@ -200,6 +205,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ],
                 ),
               ),
+              const SizedBox(height: RevoSpacing.lg),
+
+              // FR-12 / FR-13: Synchronization Status Card
+              const SyncStatusCard(),
               const SizedBox(height: RevoSpacing.xl),
 
               // Section: Organization Operational Metrics
@@ -381,6 +390,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ),
       ),
+    ),
+  ],
+),
     );
   }
 

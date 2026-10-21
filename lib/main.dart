@@ -11,7 +11,7 @@ void main() async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
-    );
+    ).timeout(const Duration(milliseconds: 1500));
   } catch (e) {
     debugPrint('Firebase initialization skipped/deferred. Operating in Mock Auth mode: $e');
   }

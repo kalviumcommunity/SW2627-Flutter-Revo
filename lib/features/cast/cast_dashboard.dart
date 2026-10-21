@@ -10,6 +10,8 @@ import '../common/conflict_resolution_screen.dart';
 import '../common/notifications_screen.dart';
 import '../common/offline_sync_banner.dart';
 import '../profile/screens/profile_screen.dart';
+import '../../services/sync/sync_timestamp_formatter.dart';
+import '../../services/sync_status_service.dart';
 import 'audition_application_screen.dart';
 import 'my_assignments_screen.dart';
 import 'my_schedule_screen.dart';
@@ -613,10 +615,18 @@ class _CastDashboardState extends State<CastDashboard> {
               _SyncRow(
                 icon: Icons.cloud_done_outlined,
                 label: 'Last Synced',
-                value: lastSynced != null
-                    ? '${lastSynced.hour.toString().padLeft(2, '0')}:${lastSynced.minute.toString().padLeft(2, '0')}'
-                    : '—',
+                value: SyncTimestampFormatter.format(lastSynced),
                 badge: 'FR-12',
+              ),
+              const SizedBox(height: 8),
+              _SyncRow(
+                icon: Icons.verified_outlined,
+                label: 'Data Freshness',
+                value: SyncStatusService.instance.freshness.name.toUpperCase(),
+                badge: 'FR-12',
+                valueColor: SyncStatusService.instance.freshness == DataFreshness.fresh
+                    ? const Color(0xFF3FA672)
+                    : const Color(0xFF946300),
               ),
               const SizedBox(height: 8),
               _SyncRow(

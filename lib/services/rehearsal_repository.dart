@@ -1,5 +1,6 @@
 import '../core/enums/revo_enums.dart';
 import '../core/errors/revo_exception.dart';
+import '../models/app_user.dart';
 import '../models/rehearsal.dart';
 
 class RehearsalInput {
@@ -35,8 +36,8 @@ class RehearsalSaveResult {
 }
 
 abstract class RehearsalRepository {
-  Future<RehearsalSaveResult> createRehearsal(RehearsalInput input);
-  Future<RehearsalSaveResult> updateRehearsal(String rehearsalId, RehearsalInput input);
-  Future<void> cancelRehearsal(String rehearsalId); // sets status = cancelled (BR-08)
+  Future<RehearsalSaveResult> createRehearsal(RehearsalInput input, {AppUser? user});
+  Future<RehearsalSaveResult> updateRehearsal(String rehearsalId, RehearsalInput input, {AppUser? user});
+  Future<void> cancelRehearsal(String rehearsalId, {AppUser? user}); // sets status = cancelled (BR-08)
   Future<Rehearsal> getRehearsal(String rehearsalId);
 }
