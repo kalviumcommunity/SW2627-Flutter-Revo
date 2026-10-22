@@ -191,6 +191,7 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
     required String email,
     required String password,
     UserRole role = UserRole.cast,
+    String? adminPasscode,
   }) async {
     if (name.trim().isEmpty ||
         email.trim().isEmpty ||

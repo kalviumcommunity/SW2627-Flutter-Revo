@@ -15,6 +15,9 @@ class Rehearsal {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  final String? title;
+  final String? notes;
+
   Rehearsal({
     required this.rehearsalId,
     required this.productionId,
@@ -27,6 +30,8 @@ class Rehearsal {
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
+    this.title,
+    this.notes,
   });
 
   Map<String, dynamic> toMap() {
@@ -42,6 +47,8 @@ class Rehearsal {
       'createdBy': createdBy,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      if (title != null) 'title': title,
+      if (notes != null) 'notes': notes,
     };
   }
 
@@ -73,6 +80,8 @@ class Rehearsal {
       createdBy: map['createdBy'] ?? '',
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
+      title: map['title'],
+      notes: map['notes'],
     );
   }
 }

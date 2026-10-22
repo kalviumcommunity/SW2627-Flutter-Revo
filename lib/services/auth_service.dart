@@ -8,6 +8,7 @@ abstract class AuthService {
     required String email,
     required String password,
     UserRole role = UserRole.cast,
+    String? adminPasscode,
   });
   Future<AppUser> login({
     required String email,

@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'core/theme/revo_theme.dart';
 import 'features/auth/role_based_router.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Safely initialize Firebase when available; falls back smoothly to Mock Auth (Issue #8)
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase initialization skipped/deferred. Operating in Mock Auth mode: $e');
+  }
 
   runApp(const RevoApp());
 }
@@ -21,13 +27,7 @@ class RevoApp extends StatelessWidget {
     return MaterialApp(
       title: 'Revo — Theatre Production Management System',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6750A4),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
+      theme: RevoTheme.lightTheme,
       home: const RoleBasedRouter(),
     );
   }
