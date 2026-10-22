@@ -373,4 +373,19 @@ void main() {
       await service.dispose();
     },
   );
+
+  test(
+    'schedule service remains usable when Firebase is uninitialized',
+    () async {
+      final service = FirebaseScheduleService();
+
+      final snapshot = await service
+          .watchProductionSchedule('production-1')
+          .first;
+
+      expect(snapshot.items, isEmpty);
+      expect(snapshot.syncState, SyncState.synced);
+      await service.dispose();
+    },
+  );
 }

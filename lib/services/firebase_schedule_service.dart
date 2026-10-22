@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import '../core/enums/revo_enums.dart';
 import '../models/rehearsal.dart';
@@ -11,14 +12,14 @@ import 'schedule_service.dart';
 /// Concrete Firebase & Firestore Stream Service implementation for Unified Schedule (FR-09, FR-10).
 /// Listens to live updates, supports offline cached snapshots, and provides real-time streams for Cast and Director schedules.
 class FirebaseScheduleService implements ScheduleService {
-  static final FirebaseScheduleService _instance =
-      FirebaseScheduleService._internal();
+  static FirebaseScheduleService? _instance;
+
   factory FirebaseScheduleService({
     FirebaseFirestore? firestore,
     AuthIdentityProvider? identityProvider,
   }) {
     if (firestore == null && identityProvider == null) {
-      return _instance;
+      return _instance ??= FirebaseScheduleService._internal();
     }
     return FirebaseScheduleService._internal(
       firestore: firestore,
@@ -27,12 +28,11 @@ class FirebaseScheduleService implements ScheduleService {
   }
 
   FirebaseScheduleService._internal({
-    FirebaseFirestore? firestore,
+    this._firestore,
     AuthIdentityProvider? identityProvider,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _identityProvider = identityProvider ?? FirebaseAuthService();
+  }) : _identityProvider = identityProvider ?? FirebaseAuthService();
 
-  final FirebaseFirestore _firestore;
+  FirebaseFirestore? _firestore;
   final AuthIdentityProvider _identityProvider;
   final List<Rehearsal> _rehearsals = [];
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
@@ -56,7 +56,13 @@ class FirebaseScheduleService implements ScheduleService {
     if (_rehearsalSubscription != null || _disposed) {
       return;
     }
-    _rehearsalSubscription = _firestore
+    final firestore = _firestore ??
+        (Firebase.apps.isEmpty ? null : FirebaseFirestore.instance);
+    if (firestore == null) {
+      return;
+    }
+    _firestore = firestore;
+    _rehearsalSubscription = firestore
         .collection('rehearsals')
         .snapshots()
         .listen(
