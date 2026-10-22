@@ -125,6 +125,132 @@ void main() {
   });
 
   test(
+    'loads production metadata and venue operations from Firestore',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('users').doc('director-1').set({
+        'name': 'Director One',
+      });
+      await firestore.collection('productions').doc('production-1').set({
+        'name': 'Hamlet',
+        'description': 'A production',
+        'directorId': 'director-1',
+        'startDate': '2026-10-01T00:00:00.000Z',
+        'endDate': '2026-10-03T00:00:00.000Z',
+        'createdAt': '2026-09-01T00:00:00.000Z',
+        'updatedAt': '2026-09-01T00:00:00.000Z',
+        'status': 'planning',
+      });
+      await firestore.collection('roles').doc('role-1').set({
+        'productionId': 'production-1',
+        'name': 'Hamlet',
+        'description': 'The lead',
+        'status': 'open',
+      });
+      await firestore.collection('castAssignments').doc('assignment-1').set({
+        'productionId': 'production-1',
+        'roleId': 'role-1',
+        'castMemberId': 'cast-1',
+        'assignedAt': '2026-09-01T00:00:00.000Z',
+        'status': 'active',
+      });
+      await firestore.collection('venues').doc('venue-1').set({
+        'name': 'Main Stage',
+        'location': 'Theatre',
+        'capacity': 100,
+        'availability': {'available': true},
+        'status': 'active',
+      });
+      await firestore.collection('rehearsals').doc('rehearsal-1').set({
+        'productionId': 'production-1',
+        'venueId': 'venue-1',
+        'startAt': '2026-10-01T10:00:00.000Z',
+        'endAt': '2026-10-01T12:00:00.000Z',
+        'participantIds': const [],
+        'status': 'confirmed',
+        'clientPending': false,
+        'createdBy': 'director-1',
+        'createdAt': '2026-09-01T00:00:00.000Z',
+        'updatedAt': '2026-09-01T00:00:00.000Z',
+      });
+
+      final identity = TestIdentityProvider(
+        const AuthIdentity(
+          userId: 'admin-1',
+          role: UserRole.admin,
+          isFirebaseAuthenticated: true,
+        ),
+      );
+      final productionRepository = FirebaseProductionRepository(
+        firestore: firestore,
+        identityProvider: identity,
+      );
+      final venueRepository = FirebaseVenueRepository(
+        firestore: firestore,
+        identityProvider: identity,
+      );
+
+      expect(
+        (await productionRepository.getProductions(
+          userId: 'admin-1',
+          role: UserRole.admin,
+        )).single.name,
+        'Hamlet',
+      );
+      expect(
+        await productionRepository.getDirectorName('director-1'),
+        'Director One',
+      );
+      expect(
+        (await productionRepository.getRolesForProduction('production-1'))
+            .single
+            .name,
+        'Hamlet',
+      );
+      expect(
+        (await productionRepository.getCastAssignmentsForProduction(
+          'production-1',
+        )).single.castMemberId,
+        'cast-1',
+      );
+      expect(
+        (await productionRepository.getRehearsalsForProduction('production-1'))
+            .single
+            .rehearsalId,
+        'rehearsal-1',
+      );
+      expect(
+        (await productionRepository.getVenuesForProduction('production-1'))
+            .single
+            .venueId,
+        'venue-1',
+      );
+      expect(
+        await productionRepository.getUserName('unknown'),
+        'Team Member (unknown)',
+      );
+      expect(
+        (await productionRepository.getVenueById('venue-1'))!.name,
+        'Main Stage',
+      );
+      expect((await venueRepository.getVenues()).length, 1);
+      expect(
+        (await venueRepository.getRehearsalsForVenue('venue-1'))
+            .single
+            .rehearsalId,
+        'rehearsal-1',
+      );
+      expect(await venueRepository.getProductionName('production-1'), 'Hamlet');
+
+      await venueRepository.toggleStatus('venue-1');
+      expect(
+        (await venueRepository.getVenue('venue-1')).status,
+        VenueStatus.inactive,
+      );
+    },
+  );
+
+  test(
     'accepts lowercase mock roles and rejects cast management access',
     () async {
       final user = AppUser.fromMap({

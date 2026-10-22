@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/enums/revo_enums.dart';
 import '../../core/errors/revo_exception.dart';
+import '../../models/rehearsal.dart';
 import '../../models/venue.dart';
 import '../../services/auth_identity.dart';
 import '../../services/firebase_auth_service.dart';
@@ -14,7 +15,8 @@ class FirebaseVenueRepository implements VenueRepository {
     FirebaseAuth? auth,
     AuthIdentityProvider? identityProvider,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _identityProvider = identityProvider ??
+       _identityProvider =
+           identityProvider ??
            (auth != null
                ? FirebaseAuthIdentityProvider(
                    auth: auth,
@@ -93,6 +95,15 @@ class FirebaseVenueRepository implements VenueRepository {
   }
 
   @override
+  Future<List<Venue>> getVenues({bool activeOnly = false}) async {
+    final snapshot = await _venues.get();
+    final venues = snapshot.docs.map(_fromDocument);
+    return activeOnly
+        ? venues.where((venue) => venue.status == VenueStatus.active).toList()
+        : venues.toList();
+  }
+
+  @override
   Future<Venue> getVenue(String venueId) async {
     final document = await _venues.doc(venueId).get();
     if (!document.exists) {
@@ -120,6 +131,44 @@ class FirebaseVenueRepository implements VenueRepository {
       throw RevoException(RevoErrorCode.notFound, 'Venue not found.');
     }
     await document.update(_mapInput(input));
+  }
+
+  @override
+  Future<void> toggleStatus(String venueId) async {
+    await _requireAdmin();
+    final document = _venues.doc(venueId);
+    final snapshot = await document.get();
+    if (!snapshot.exists) {
+      throw RevoException(RevoErrorCode.notFound, 'Venue not found.');
+    }
+    final venue = _fromDocument(snapshot);
+    final status = venue.status == VenueStatus.active
+        ? VenueStatus.inactive
+        : VenueStatus.active;
+    await document.update({'status': status.name});
+  }
+
+  @override
+  Future<List<Rehearsal>> getRehearsalsForVenue(String venueId) async {
+    final snapshot = await _firestore
+        .collection('rehearsals')
+        .where('venueId', isEqualTo: venueId)
+        .get();
+    return snapshot.docs
+        .map((document) => Rehearsal.fromMap(document.data(), document.id))
+        .where((rehearsal) => rehearsal.status != RehearsalStatus.cancelled)
+        .toList()
+      ..sort((a, b) => a.startAt.compareTo(b.startAt));
+  }
+
+  @override
+  Future<String> getProductionName(String productionId) async {
+    final document = await _firestore
+        .collection('productions')
+        .doc(productionId)
+        .get();
+    final name = document.data()?['name']?.toString().trim();
+    return name == null || name.isEmpty ? 'Unknown Production' : name;
   }
 
   @override

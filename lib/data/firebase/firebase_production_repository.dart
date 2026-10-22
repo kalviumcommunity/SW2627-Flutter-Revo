@@ -3,7 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/enums/revo_enums.dart';
 import '../../core/errors/revo_exception.dart';
+import '../../models/cast_assignment.dart';
 import '../../models/production.dart';
+import '../../models/production_role.dart';
+import '../../models/rehearsal.dart';
+import '../../models/venue.dart';
 import '../../services/auth_identity.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/production_repository.dart';
@@ -27,6 +31,8 @@ class FirebaseProductionRepository implements ProductionRepository {
   final AuthIdentityProvider _identityProvider;
   CollectionReference<Map<String, dynamic>> get _productions =>
       _firestore.collection('productions');
+  CollectionReference<Map<String, dynamic>> get _users =>
+      _firestore.collection('users');
 
   dynamic _value(Map<String, dynamic> data, String key) => data[key];
   DateTime _date(dynamic value) {
@@ -110,17 +116,59 @@ class FirebaseProductionRepository implements ProductionRepository {
     return identity;
   }
 
+  Future<void> _requireProductionAccess(String productionId) async {
+    final identity = await _requireManager();
+    if (identity.role == UserRole.admin) {
+      return;
+    }
+    final production = await _productions.doc(productionId).get();
+    if (!production.exists ||
+        production.data()?['directorId'] != identity.userId) {
+      throw RevoException(
+        RevoErrorCode.permissionDenied,
+        'Directors can only manage their own productions.',
+      );
+    }
+  }
+
   @override
-  Future<Production> createProduction(ProductionInput input) async {
+  Future<List<Production>> getProductions({
+    required String userId,
+    required UserRole role,
+  }) async {
+    Query<Map<String, dynamic>> query = _productions;
+    if (role == UserRole.director) {
+      query = query.where('directorId', isEqualTo: userId);
+    }
+    final snapshot = await query.get();
+    return snapshot.docs.map(_fromDocument).toList()
+      ..sort((a, b) => a.startDate.compareTo(b.startDate));
+  }
+
+  @override
+  Future<Production> createProduction(
+    ProductionInput input, {
+    String? directorId,
+  }) async {
     final identity = await _requireManager();
     _validate(input);
+    final selectedDirectorId = directorId?.trim().isNotEmpty == true
+        ? directorId!.trim()
+        : identity.userId;
+    if (identity.role == UserRole.director &&
+        selectedDirectorId != identity.userId) {
+      throw RevoException(
+        RevoErrorCode.permissionDenied,
+        'Directors can only create productions for themselves.',
+      );
+    }
     final ref = _productions.doc();
     final now = DateTime.now();
     final production = Production(
       productionId: ref.id,
       name: input.name.trim(),
       description: input.description.trim(),
-      directorId: identity.userId,
+      directorId: selectedDirectorId,
       startDate: input.startDate,
       endDate: input.endDate,
       status: input.status,
@@ -136,6 +184,7 @@ class FirebaseProductionRepository implements ProductionRepository {
     String productionId,
     ProductionInput input,
   ) async {
+    await _requireProductionAccess(productionId);
     _validate(input);
     final ref = _productions.doc(productionId);
     if (!(await ref.get()).exists) {
@@ -156,7 +205,7 @@ class FirebaseProductionRepository implements ProductionRepository {
 
   @override
   Future<void> setStatus(String productionId, ProductionStatus status) async {
-    await _requireManager();
+    await _requireProductionAccess(productionId);
     final ref = _productions.doc(productionId);
     if (!(await ref.get()).exists) {
       throw RevoException(
@@ -168,5 +217,100 @@ class FirebaseProductionRepository implements ProductionRepository {
       'status': status.name,
       'updatedAt': DateTime.now().toIso8601String(),
     });
+  }
+
+  @override
+  Future<String> getDirectorName(String directorId) => getUserName(directorId);
+
+  @override
+  Future<List<ProductionRole>> getRolesForProduction(String productionId) async {
+    final snapshot = await _firestore
+        .collection('roles')
+        .where('productionId', isEqualTo: productionId)
+        .get();
+    return snapshot.docs
+        .map((document) => ProductionRole.fromMap(document.data(), document.id))
+        .toList();
+  }
+
+  @override
+  Future<List<CastAssignment>> getCastAssignmentsForProduction(
+    String productionId,
+  ) async {
+    final snapshot = await _firestore
+        .collection('castAssignments')
+        .where('productionId', isEqualTo: productionId)
+        .get();
+    return snapshot.docs
+        .map((document) => CastAssignment.fromMap(document.data(), document.id))
+        .where((assignment) => assignment.status == AssignmentStatus.active)
+        .toList();
+  }
+
+  @override
+  Future<List<Rehearsal>> getRehearsalsForProduction(
+    String productionId,
+  ) async {
+    final snapshot = await _firestore
+        .collection('rehearsals')
+        .where('productionId', isEqualTo: productionId)
+        .get();
+    return snapshot.docs
+        .map((document) => Rehearsal.fromMap(document.data(), document.id))
+        .where((rehearsal) => rehearsal.status != RehearsalStatus.cancelled)
+        .toList()
+      ..sort((a, b) => a.startAt.compareTo(b.startAt));
+  }
+
+  @override
+  Future<List<Venue>> getVenuesForProduction(String productionId) async {
+    final rehearsals = await getRehearsalsForProduction(productionId);
+    final venueIds = rehearsals.map((rehearsal) => rehearsal.venueId).toSet();
+    if (venueIds.isEmpty) {
+      return [];
+    }
+    final venues = <Venue>[];
+    for (final venueId in venueIds) {
+      final venue = await getVenueById(venueId);
+      if (venue != null) {
+        venues.add(venue);
+      }
+    }
+    return venues;
+  }
+
+  @override
+  Future<String> getUserName(String userId) async {
+    final document = await _users.doc(userId).get();
+    final name = document.data()?['name']?.toString().trim();
+    return name == null || name.isEmpty ? 'Team Member ($userId)' : name;
+  }
+
+  @override
+  Future<Venue?> getVenueById(String venueId) async {
+    final document = await _firestore.collection('venues').doc(venueId).get();
+    return document.exists
+        ? Venue.fromMap(
+            _normalizeVenueData(document.data()!, document.id),
+            document.id,
+          )
+        : null;
+  }
+
+  Map<String, dynamic> _normalizeVenueData(
+    Map<String, dynamic> data,
+    String id,
+  ) {
+    final normalized = Map<String, dynamic>.from(data);
+    final availability = normalized['availability'];
+    normalized['availability'] = availability is Map
+        ? Map<String, dynamic>.from(availability)
+        : <String, dynamic>{'available': availability is bool && availability};
+    final status = normalized['status']?.toString().toUpperCase();
+    normalized['status'] = status == 'AVAILABLE'
+        ? VenueStatus.active.name
+        : status?.toLowerCase();
+    normalized['venueId'] ??= id;
+    return normalized;
   }
 }
