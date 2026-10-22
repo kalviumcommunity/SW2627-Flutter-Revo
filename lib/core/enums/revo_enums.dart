@@ -70,3 +70,24 @@ enum SyncState {
   pending,
   conflict,
 }
+
+/// Independent Connectivity State (FR-12, FR-13)
+enum ConnectivityState {
+  online,
+  offline,
+  unknown,
+}
+
+/// Independent Data Freshness State (FR-12)
+enum DataFreshness {
+  fresh,
+  stale,
+  unknown,
+}
+
+/// Independent Write Synchronization State (FR-13)
+enum WriteSyncStatus {
+  pending,
+  confirmed,
+  failed,
+}

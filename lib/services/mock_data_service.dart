@@ -429,6 +429,7 @@ class MockDataService {
     required RehearsalInput input,
     required String createdBy,
     RehearsalStatus status = RehearsalStatus.confirmed,
+    bool clientPending = false,
   }) async {
     final now = DateTime.now();
     final newId = 'reh_${now.millisecondsSinceEpoch}';
@@ -440,7 +441,7 @@ class MockDataService {
       endAt: input.endAt,
       participantIds: List.from(input.participantIds),
       status: status,
-      clientPending: false,
+      clientPending: clientPending,
       createdBy: createdBy,
       createdAt: now,
       updatedAt: now,

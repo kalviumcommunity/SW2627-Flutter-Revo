@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../core/enums/revo_enums.dart';
 import '../core/errors/revo_exception.dart';
+import '../models/app_user.dart';
 import '../models/rehearsal.dart';
 import 'auth_identity.dart';
 import 'firebase_auth_service.dart';
@@ -72,9 +73,7 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
         .get();
     final conflicts = <Conflict>[];
     for (final document in snapshot.docs) {
-      if (document.id == excludeRehearsalId) {
-        continue;
-      }
+      if (document.id == excludeRehearsalId) continue;
       final data = document.data();
       final start = _date(data['startAt']);
       final end = _date(data['endAt']);
@@ -122,7 +121,10 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
   }
 
   @override
-  Future<RehearsalSaveResult> createRehearsal(RehearsalInput input) async {
+  Future<RehearsalSaveResult> createRehearsal(
+    RehearsalInput input, {
+    AppUser? user,
+  }) async {
     final userId = await _requireManager();
     _validate(input);
     final conflicts = await _conflicts(input);
@@ -143,6 +145,8 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
       createdBy: userId,
       createdAt: now,
       updatedAt: now,
+      title: input.title,
+      notes: input.notes,
     );
     await ref.set(rehearsal.toMap());
     return RehearsalSaveResult(rehearsal: rehearsal);
@@ -151,8 +155,9 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
   @override
   Future<RehearsalSaveResult> updateRehearsal(
     String rehearsalId,
-    RehearsalInput input,
-  ) async {
+    RehearsalInput input, {
+    AppUser? user,
+  }) async {
     await _requireManager();
     _validate(input);
     final ref = _rehearsals.doc(rehearsalId);
@@ -177,13 +182,18 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
       createdBy: existing.createdBy,
       createdAt: existing.createdAt,
       updatedAt: DateTime.now(),
+      title: input.title ?? existing.title,
+      notes: input.notes ?? existing.notes,
     );
     await ref.set(updated.toMap());
     return RehearsalSaveResult(rehearsal: updated);
   }
 
   @override
-  Future<void> cancelRehearsal(String rehearsalId) async {
+  Future<void> cancelRehearsal(
+    String rehearsalId, {
+    AppUser? user,
+  }) async {
     await _requireManager();
     final ref = _rehearsals.doc(rehearsalId);
     if (!(await ref.get()).exists) {

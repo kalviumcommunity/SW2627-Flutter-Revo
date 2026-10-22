@@ -10,7 +10,10 @@ import '../../services/firebase_auth_service.dart';
 import '../../services/mock_data_service.dart';
 import '../../services/mock_production_repository.dart';
 import '../../services/mock_rehearsal_repository.dart';
+import '../../services/sync/sync_timestamp_formatter.dart';
+import '../../services/sync_status_service.dart';
 import 'production_detail_screen.dart';
+import 'widgets/sync_status_indicators.dart';
 
 /// FR-05, FR-08 & Phase 5: Rehearsal Details Screen (Issue #21).
 /// Displays comprehensive rehearsal scheduling data, production attribution,
@@ -201,6 +204,115 @@ class _RehearsalDetailScreenState extends State<RehearsalDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ── FR-12 / FR-13: Write Synchronization State & Freshness ───────
+            StreamBuilder<WriteSyncStatus>(
+              stream: SyncStatusService.instance
+                  .watchEntityStatus(rehearsal.rehearsalId),
+              builder: (context, syncSnap) {
+                final writeStatus = syncSnap.data ??
+                    (rehearsal.clientPending
+                        ? WriteSyncStatus.pending
+                        : WriteSyncStatus.confirmed);
+
+                if (writeStatus == WriteSyncStatus.pending) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: RevoSpacing.md),
+                    padding: const EdgeInsets.all(RevoSpacing.md),
+                    decoration: BoxDecoration(
+                      color: RevoColors.warningSurface,
+                      borderRadius: RevoSpacing.borderRadiusCard,
+                      border: Border.all(color: RevoColors.warningAmber),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.upload_outlined,
+                            color: RevoColors.warningText, size: 20),
+                        const SizedBox(width: RevoSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Pending Synchronization (FR-13)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: RevoColors.warningText,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'This change is stored locally on your device and will be confirmed once connected to the server.',
+                                style: RevoTypography.caption.copyWith(
+                                  color: RevoColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const EntitySyncBadge(status: WriteSyncStatus.pending),
+                      ],
+                    ),
+                  );
+                } else if (writeStatus == WriteSyncStatus.failed) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: RevoSpacing.md),
+                    padding: const EdgeInsets.all(RevoSpacing.md),
+                    decoration: BoxDecoration(
+                      color: RevoColors.errorSurface,
+                      borderRadius: RevoSpacing.borderRadiusCard,
+                      border: Border.all(color: RevoColors.errorCrimson),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            color: RevoColors.errorCrimson, size: 20),
+                        const SizedBox(width: RevoSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Synchronization Failed',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: RevoColors.errorCrimson,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Could not synchronize this rehearsal with the server. Tap retry to attempt persistence again.',
+                                style: RevoTypography.caption.copyWith(
+                                  color: RevoColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                                color: RevoColors.errorCrimson),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                          ),
+                          onPressed: () =>
+                              SyncStatusService.instance.reconcilePending(),
+                          child: const Text('Retry',
+                              style:
+                                  TextStyle(color: RevoColors.errorCrimson)),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+
             // ── Status Banner ──────────────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(RevoSpacing.md),
@@ -299,11 +411,21 @@ class _RehearsalDetailScreenState extends State<RehearsalDetailScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: RevoSpacing.sm),
-                  Text(
-                    'Rehearsal ID: ${rehearsal.rehearsalId}',
-                    style: RevoTypography.caption
-                        .copyWith(color: RevoColors.textMuted),
+                  Row(
+                    children: [
+                      Text(
+                        'Rehearsal ID: ${rehearsal.rehearsalId}',
+                        style: RevoTypography.caption
+                            .copyWith(color: RevoColors.textMuted),
+                      ),
+                      const Spacer(),
+                      Text(
+                        SyncTimestampFormatter.formatWithPrefix(
+                            SyncStatusService.instance.lastSyncedAt),
+                        style: RevoTypography.caption
+                            .copyWith(color: RevoColors.textTertiary),
+                      ),
+                    ],
                   ),
                 ],
               ),
