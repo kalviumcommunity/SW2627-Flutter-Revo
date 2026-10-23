@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+
 import '../../core/enums/revo_enums.dart';
 import '../../models/rehearsal.dart';
 import 'pending_write_op.dart';
@@ -15,7 +16,7 @@ class SyncCacheStore {
   final Map<String, PendingWriteOp> _pendingOps = {};
 
   SyncCacheStore({File? customFile, this._inMemoryOnly = false})
-      : _storageFile = customFile ?? _defaultStorageFile() {
+    : _storageFile = customFile ?? _defaultStorageFile() {
     load();
   }
 
@@ -97,7 +98,9 @@ class SyncCacheStore {
         _cachedRehearsals.clear();
         for (final item in data['rehearsals'] as List) {
           if (item is Map<String, dynamic>) {
-            final id = item['rehearsalId'] as String? ?? 'cached_${DateTime.now().millisecondsSinceEpoch}';
+            final id =
+                item['rehearsalId'] as String? ??
+                'cached_${DateTime.now().millisecondsSinceEpoch}';
             _cachedRehearsals.add(Rehearsal.fromMap(item, id));
           }
         }
@@ -128,7 +131,23 @@ class SyncCacheStore {
     try {
       final payload = {
         'lastSyncedAt': _lastSyncedAt?.toIso8601String(),
-        'rehearsals': _cachedRehearsals.map((r) => r.toMap()).toList(),
+        'rehearsals': _cachedRehearsals.map((r) {
+          return {
+            'rehearsalId': r.rehearsalId,
+            'productionId': r.productionId,
+            'venueId': r.venueId,
+            'startAt': r.startAt.toIso8601String(),
+            'endAt': r.endAt.toIso8601String(),
+            'participantIds': r.participantIds,
+            'status': r.status.name,
+            'clientPending': r.clientPending,
+            'createdBy': r.createdBy,
+            'createdAt': r.createdAt.toIso8601String(),
+            'updatedAt': r.updatedAt.toIso8601String(),
+            if (r.title != null) 'title': r.title,
+            if (r.notes != null) 'notes': r.notes,
+          };
+        }).toList(),
         'pendingOps': _pendingOps.values.map((op) => op.toMap()).toList(),
       };
       file.writeAsStringSync(jsonEncode(payload));

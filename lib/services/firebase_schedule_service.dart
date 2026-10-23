@@ -1,113 +1,89 @@
 import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 import '../core/enums/revo_enums.dart';
 import '../models/rehearsal.dart';
+import 'auth_identity.dart';
 import 'firebase_auth_service.dart';
 import 'schedule_service.dart';
-import 'sync/sync_cache_store.dart';
 import 'sync_status_service.dart';
 
-/// Concrete Firebase & Firestore Stream Service implementation for Unified Schedule (FR-09, FR-10).
-/// Listens to live updates, supports offline cached snapshots, and provides real-time streams for Cast and Director schedules.
+/// Firestore-backed unified schedule service for cast and director schedules.
 class FirebaseScheduleService implements ScheduleService {
-  static final FirebaseScheduleService _instance =
-      FirebaseScheduleService._internal();
-  factory FirebaseScheduleService() => _instance;
+  static FirebaseScheduleService? _instance;
 
+  factory FirebaseScheduleService({
+    FirebaseFirestore? firestore,
+    AuthIdentityProvider? identityProvider,
+  }) {
+    if (firestore == null && identityProvider == null) {
+      return _instance ??= FirebaseScheduleService._internal();
+    }
+    return FirebaseScheduleService._internal(
+      firestore: firestore,
+      identityProvider: identityProvider,
+    );
+  }
+
+  FirebaseScheduleService._internal({
+    this._firestore,
+    AuthIdentityProvider? identityProvider,
+  }) : _identityProvider = identityProvider ?? FirebaseAuthService();
+
+  FirebaseFirestore? _firestore;
+  final AuthIdentityProvider _identityProvider;
+  final SyncStatusService _syncStatusService = SyncStatusService.instance;
   final List<Rehearsal> _rehearsals = [];
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+  _rehearsalSubscription;
   final StreamController<List<Rehearsal>> _rehearsalsController =
       StreamController<List<Rehearsal>>.broadcast();
-
-  final FirebaseAuthService _authService = FirebaseAuthService();
-  final SyncStatusService _syncStatusService = SyncStatusService.instance;
-  final SyncCacheStore _cacheStore = SyncCacheStore();
-
-  StreamSubscription<dynamic>? _syncSubscription;
-
-  FirebaseScheduleService._internal() {
-    _restoreOrSeedData();
-    _syncSubscription = _syncStatusService.watchSnapshot().listen((_) {
-      _rehearsalsController.add(List.unmodifiable(_rehearsals));
-    });
-  }
-
-  void _restoreOrSeedData() {
-    final cached = _cacheStore.cachedRehearsals;
-    if (cached.isNotEmpty) {
-      _rehearsals.addAll(cached);
-    } else {
-      _seedInitialData();
-    }
-  }
-
-  void _seedInitialData() {
-    final now = DateTime.now();
-    _rehearsals.addAll([
-      Rehearsal(
-        rehearsalId: 'reh_101',
-        productionId: 'prod_1',
-        venueId: 'Studio A - Main Stage',
-        startAt: now.add(const Duration(days: 1, hours: 2)),
-        endAt: now.add(const Duration(days: 1, hours: 5)),
-        participantIds: ['cast_201', 'dir_101'],
-        status: RehearsalStatus.confirmed,
-        clientPending: false,
-        createdBy: 'dir_101',
-        createdAt: now.subtract(const Duration(days: 2)),
-        updatedAt: now.subtract(const Duration(days: 2)),
-      ),
-      Rehearsal(
-        rehearsalId: 'reh_102',
-        productionId: 'prod_1',
-        venueId: 'Studio B - Rehearsal Room',
-        startAt: now.add(const Duration(days: 3, hours: 4)),
-        endAt: now.add(const Duration(days: 3, hours: 7)),
-        participantIds: ['cast_201', 'cast_202', 'dir_101'],
-        status: RehearsalStatus.proposed,
-        clientPending: false,
-        createdBy: 'dir_101',
-        createdAt: now.subtract(const Duration(days: 1)),
-        updatedAt: now.subtract(const Duration(days: 1)),
-      ),
-      Rehearsal(
-        rehearsalId: 'reh_103',
-        productionId: 'prod_1',
-        venueId: 'Black Box Theatre',
-        startAt: now.add(const Duration(days: 5, hours: 1)),
-        endAt: now.add(const Duration(days: 5, hours: 4)),
-        participantIds: ['cast_201', 'dir_101'],
-        status: RehearsalStatus.confirmed,
-        clientPending: true,
-        createdBy: 'dir_101',
-        createdAt: now,
-        updatedAt: now,
-      ),
-      Rehearsal(
-        rehearsalId: 'reh_104_cancelled',
-        productionId: 'prod_1',
-        venueId: 'Studio C',
-        startAt: now.subtract(const Duration(days: 1)),
-        endAt: now.subtract(const Duration(days: 1, hours: -3)),
-        participantIds: ['cast_201'],
-        status: RehearsalStatus.cancelled,
-        clientPending: false,
-        createdBy: 'dir_101',
-        createdAt: now.subtract(const Duration(days: 4)),
-        updatedAt: now.subtract(const Duration(days: 1)),
-      ),
-    ]);
-
-    _cacheStore.saveRehearsals(_rehearsals);
-    _rehearsalsController.add(List.unmodifiable(_rehearsals));
-  }
+  bool _disposed = false;
 
   void _notifyListeners() {
-    _cacheStore.saveRehearsals(_rehearsals);
+    if (_disposed || _rehearsalsController.isClosed) return;
     _rehearsalsController.add(List.unmodifiable(_rehearsals));
   }
 
-  void notifyDataChanged() {
-    _notifyListeners();
+  void _startFirestoreListener() {
+    if (_rehearsalSubscription != null || _disposed) return;
+    final firestore =
+        _firestore ??
+        (Firebase.apps.isEmpty ? null : FirebaseFirestore.instance);
+    if (firestore == null) return;
+    _firestore = firestore;
+    _rehearsalSubscription = firestore
+        .collection('rehearsals')
+        .snapshots()
+        .listen(
+          (snapshot) {
+            try {
+              final rehearsals = snapshot.docs
+                  .map(
+                    (document) =>
+                        Rehearsal.fromMap(document.data(), document.id),
+                  )
+                  .toList();
+              _rehearsals
+                ..clear()
+                ..addAll(rehearsals);
+              _syncStatusService.recordSuccessfulSync();
+              _notifyListeners();
+            } catch (error) {
+              _syncStatusService.recordSyncFailure(error.toString());
+              _notifyListeners();
+            }
+          },
+          onError: (Object error) {
+            _syncStatusService.recordSyncFailure(error.toString());
+            _notifyListeners();
+          },
+        );
   }
+
+  void notifyDataChanged() => _notifyListeners();
 
   List<Rehearsal> get rawRehearsals => List.unmodifiable(_rehearsals);
 
@@ -115,202 +91,169 @@ class FirebaseScheduleService implements ScheduleService {
   DateTime? get lastSyncedAt => _syncStatusService.lastSyncedAt;
 
   void addRehearsal(Rehearsal rehearsal) {
-    // If offline, ensure rehearsal is marked clientPending
-    final effective = _syncStatusService.connectivity == ConnectivityState.offline
-        ? Rehearsal(
-            rehearsalId: rehearsal.rehearsalId,
-            productionId: rehearsal.productionId,
-            venueId: rehearsal.venueId,
-            startAt: rehearsal.startAt,
-            endAt: rehearsal.endAt,
-            participantIds: rehearsal.participantIds,
-            status: rehearsal.status,
-            clientPending: true,
-            createdBy: rehearsal.createdBy,
-            createdAt: rehearsal.createdAt,
-            updatedAt: DateTime.now(),
-            title: rehearsal.title,
-            notes: rehearsal.notes,
-          )
-        : rehearsal;
-
+    if (_disposed) return;
+    final effective = _withPendingState(rehearsal);
     _rehearsals.add(effective);
-
     if (effective.clientPending) {
-      _syncStatusService.queuePendingWrite(
-        entityType: 'rehearsal',
-        entityId: effective.rehearsalId,
-        action: 'create',
-        payload: effective.toMap(),
-      );
+      _queuePendingWrite(effective, 'create');
     }
-
     _notifyListeners();
   }
 
   void updateRehearsal(Rehearsal rehearsal) {
-    final index =
-        _rehearsals.indexWhere((r) => r.rehearsalId == rehearsal.rehearsalId);
-    if (index != -1) {
-      final isOffline =
-          _syncStatusService.connectivity == ConnectivityState.offline;
-      final effective = isOffline
-          ? Rehearsal(
-              rehearsalId: rehearsal.rehearsalId,
-              productionId: rehearsal.productionId,
-              venueId: rehearsal.venueId,
-              startAt: rehearsal.startAt,
-              endAt: rehearsal.endAt,
-              participantIds: rehearsal.participantIds,
-              status: rehearsal.status,
-              clientPending: true,
-              createdBy: rehearsal.createdBy,
-              createdAt: rehearsal.createdAt,
-              updatedAt: DateTime.now(),
-              title: rehearsal.title,
-              notes: rehearsal.notes,
-            )
-          : rehearsal;
-
-      _rehearsals[index] = effective;
-
-      if (effective.clientPending) {
-        _syncStatusService.queuePendingWrite(
-          entityType: 'rehearsal',
-          entityId: effective.rehearsalId,
-          action: 'update',
-          payload: effective.toMap(),
-        );
-      }
-
-      _notifyListeners();
+    if (_disposed) return;
+    final index = _rehearsals.indexWhere(
+      (item) => item.rehearsalId == rehearsal.rehearsalId,
+    );
+    if (index == -1) return;
+    final effective = _withPendingState(rehearsal);
+    _rehearsals[index] = effective;
+    if (effective.clientPending) {
+      _queuePendingWrite(effective, 'update');
     }
+    _notifyListeners();
   }
 
   void cancelRehearsal(String rehearsalId) {
-    final index = _rehearsals.indexWhere((r) => r.rehearsalId == rehearsalId);
-    if (index != -1) {
-      final existing = _rehearsals[index];
-      final isOffline =
-          _syncStatusService.connectivity == ConnectivityState.offline;
-
-      _rehearsals[index] = Rehearsal(
-        rehearsalId: existing.rehearsalId,
-        productionId: existing.productionId,
-        venueId: existing.venueId,
-        startAt: existing.startAt,
-        endAt: existing.endAt,
-        participantIds: existing.participantIds,
-        status: RehearsalStatus.cancelled,
-        clientPending: isOffline,
-        createdBy: existing.createdBy,
-        createdAt: existing.createdAt,
-        updatedAt: DateTime.now(),
+    if (_disposed) return;
+    final index = _rehearsals.indexWhere(
+      (item) => item.rehearsalId == rehearsalId,
+    );
+    if (index == -1) return;
+    final existing = _rehearsals[index];
+    final cancelled = Rehearsal(
+      rehearsalId: existing.rehearsalId,
+      productionId: existing.productionId,
+      venueId: existing.venueId,
+      startAt: existing.startAt,
+      endAt: existing.endAt,
+      participantIds: existing.participantIds,
+      status: RehearsalStatus.cancelled,
+      clientPending:
+          _syncStatusService.connectivity == ConnectivityState.offline,
+      createdBy: existing.createdBy,
+      createdAt: existing.createdAt,
+      updatedAt: DateTime.now(),
+      title: existing.title,
+      notes: existing.notes,
+    );
+    _rehearsals[index] = cancelled;
+    if (cancelled.clientPending) {
+      _syncStatusService.queuePendingWrite(
+        entityType: 'rehearsal',
+        entityId: cancelled.rehearsalId,
+        action: 'cancel',
+        payload: {'status': RehearsalStatus.cancelled.name},
       );
-
-      if (isOffline) {
-        _syncStatusService.queuePendingWrite(
-          entityType: 'rehearsal',
-          entityId: existing.rehearsalId,
-          action: 'cancel',
-          payload: {'status': RehearsalStatus.cancelled.name},
-        );
-      }
-
-      _notifyListeners();
     }
+    _notifyListeners();
   }
 
   void setSyncState(SyncState state) {
     switch (state) {
       case SyncState.offline:
         _syncStatusService.setConnectivity(ConnectivityState.offline);
-        break;
       case SyncState.synced:
         _syncStatusService.setConnectivity(ConnectivityState.online);
         _syncStatusService.recordSuccessfulSync();
-        break;
       case SyncState.stale:
         _syncStatusService.reEvaluateFreshness();
-        break;
       case SyncState.pending:
-        // Already handled by queueing pending writes
-        break;
       case SyncState.conflict:
         break;
     }
     _notifyListeners();
   }
 
+  Rehearsal _withPendingState(Rehearsal rehearsal) {
+    if (_syncStatusService.connectivity != ConnectivityState.offline ||
+        rehearsal.clientPending) {
+      return rehearsal;
+    }
+    return Rehearsal(
+      rehearsalId: rehearsal.rehearsalId,
+      productionId: rehearsal.productionId,
+      venueId: rehearsal.venueId,
+      startAt: rehearsal.startAt,
+      endAt: rehearsal.endAt,
+      participantIds: rehearsal.participantIds,
+      status: rehearsal.status,
+      clientPending: true,
+      createdBy: rehearsal.createdBy,
+      createdAt: rehearsal.createdAt,
+      updatedAt: DateTime.now(),
+      title: rehearsal.title,
+      notes: rehearsal.notes,
+    );
+  }
+
+  void _queuePendingWrite(Rehearsal rehearsal, String action) {
+    _syncStatusService.queuePendingWrite(
+      entityType: 'rehearsal',
+      entityId: rehearsal.rehearsalId,
+      action: action,
+      payload: rehearsal.toMap(),
+    );
+  }
+
   @override
   Stream<ScheduleSnapshot> watchMySchedule() {
-    Future.microtask(() => _notifyListeners());
-
+    _startFirestoreListener();
+    Future.microtask(_notifyListeners);
     return _rehearsalsController.stream.asyncMap((list) async {
-      final currentUser = await _authService.currentUser();
-      final userId = currentUser?.userId ?? 'cast_201';
-
-      // Chronological, cancelled excluded (FR-09 requirement)
-      final filtered = list.where((r) {
-        if (r.status == RehearsalStatus.cancelled) return false;
-        return r.participantIds.contains(userId) || r.createdBy == userId;
-      }).toList();
-
-      filtered.sort((a, b) => a.startAt.compareTo(b.startAt));
-
-      // Rehearsal has pending writes if clientPending is true OR operation in pending status
-      final hasPendingWrites = filtered.any((r) =>
-          r.clientPending ||
-          _syncStatusService.getEntityStatus(r.rehearsalId) ==
-              WriteSyncStatus.pending);
-
-      final snap = _syncStatusService.currentSnapshot;
-
-      return ScheduleSnapshot(
-        items: filtered,
-        syncState: snap.legacySyncState,
-        lastSyncedAt: snap.lastSyncedAt,
-        hasPendingWrites: hasPendingWrites,
-      );
+      final identity = await _identityProvider.currentIdentity();
+      final userId = identity?.userId;
+      final filtered =
+          list
+              .where(
+                (rehearsal) =>
+                    rehearsal.status != RehearsalStatus.cancelled &&
+                    userId != null &&
+                    (rehearsal.participantIds.contains(userId) ||
+                        rehearsal.createdBy == userId),
+              )
+              .toList()
+            ..sort((a, b) => a.startAt.compareTo(b.startAt));
+      return _snapshot(filtered);
     });
   }
 
   @override
   Stream<ScheduleSnapshot> watchProductionSchedule(String productionId) {
-    Future.microtask(() => _notifyListeners());
-
+    _startFirestoreListener();
+    Future.microtask(_notifyListeners);
     return _rehearsalsController.stream.map((list) {
-      // Chronological, cancelled excluded (FR-09 requirement)
-      final filtered = list.where((r) {
-        if (r.status == RehearsalStatus.cancelled) return false;
-        return r.productionId == productionId;
-      }).toList();
-
-      filtered.sort((a, b) => a.startAt.compareTo(b.startAt));
-
-      final hasPendingWrites = filtered.any((r) =>
-          r.clientPending ||
-          _syncStatusService.getEntityStatus(r.rehearsalId) ==
-              WriteSyncStatus.pending);
-
-      final snap = _syncStatusService.currentSnapshot;
-
-      return ScheduleSnapshot(
-        items: filtered,
-        syncState: snap.legacySyncState,
-        lastSyncedAt: snap.lastSyncedAt,
-        hasPendingWrites: hasPendingWrites,
-      );
+      final filtered =
+          list
+              .where(
+                (rehearsal) =>
+                    rehearsal.status != RehearsalStatus.cancelled &&
+                    rehearsal.productionId == productionId,
+              )
+              .toList()
+            ..sort((a, b) => a.startAt.compareTo(b.startAt));
+      return _snapshot(filtered);
     });
   }
 
-  void reset() {
-    _rehearsals.clear();
-    _seedInitialData();
+  ScheduleSnapshot _snapshot(List<Rehearsal> items) {
+    return ScheduleSnapshot(
+      items: items,
+      syncState: _syncStatusService.currentSnapshot.legacySyncState,
+      lastSyncedAt: _syncStatusService.lastSyncedAt,
+      hasPendingWrites: items.any(
+        (item) =>
+            item.clientPending ||
+            _syncStatusService.getEntityStatus(item.rehearsalId) ==
+                WriteSyncStatus.pending,
+      ),
+    );
   }
 
-  void dispose() {
-    _syncSubscription?.cancel();
-    _rehearsalsController.close();
+  Future<void> dispose() async {
+    _disposed = true;
+    await _rehearsalSubscription?.cancel();
+    _rehearsalSubscription = null;
+    await _rehearsalsController.close();
   }
 }

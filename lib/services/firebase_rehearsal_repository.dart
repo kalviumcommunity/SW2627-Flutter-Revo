@@ -1,60 +1,155 @@
-import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../core/enums/revo_enums.dart';
 import '../core/errors/revo_exception.dart';
 import '../models/app_user.dart';
 import '../models/rehearsal.dart';
+import 'auth_identity.dart';
 import 'firebase_auth_service.dart';
-import 'firebase_schedule_service.dart';
 import 'rehearsal_repository.dart';
-import 'sync_status_service.dart';
 
-/// Concrete Implementation of RehearsalRepository managing creation, modification, and cancellation of rehearsals (FR-05, FR-09, BR-08).
 class FirebaseRehearsalRepository implements RehearsalRepository {
-  static final FirebaseRehearsalRepository _instance =
-      FirebaseRehearsalRepository._internal();
-  factory FirebaseRehearsalRepository() => _instance;
+  FirebaseRehearsalRepository({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    AuthIdentityProvider? identityProvider,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _identityProvider = identityProvider ??
+           (auth != null
+               ? FirebaseAuthIdentityProvider(
+                   auth: auth,
+                   firestore: firestore ?? FirebaseFirestore.instance,
+                 )
+               : FirebaseAuthService());
 
-  FirebaseRehearsalRepository._internal();
+  final FirebaseFirestore _firestore;
+  final AuthIdentityProvider _identityProvider;
+  CollectionReference<Map<String, dynamic>> get _rehearsals =>
+      _firestore.collection('rehearsals');
 
-  final FirebaseAuthService _authService = FirebaseAuthService();
-  final FirebaseScheduleService _scheduleService = FirebaseScheduleService();
+  Future<String> _requireManager() async {
+    final identity = await _identityProvider.currentIdentity();
+    if (identity == null || !identity.isFirebaseAuthenticated) {
+      throw RevoException(
+        RevoErrorCode.unauthenticated,
+        'Authentication is required.',
+      );
+    }
+    if (identity.role != UserRole.director &&
+        identity.role != UserRole.admin) {
+      throw RevoException(
+        RevoErrorCode.permissionDenied,
+        'Only directors or admins can manage rehearsals.',
+      );
+    }
+    return identity.userId;
+  }
+
+  void _validate(RehearsalInput input) {
+    if (input.productionId.trim().isEmpty || input.venueId.trim().isEmpty) {
+      throw ArgumentError('Production and venue are required.');
+    }
+    if (!input.startAt.isBefore(input.endAt)) {
+      throw ArgumentError('Rehearsal start must be before its end.');
+    }
+  }
+
+  DateTime _date(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    if (parsed == null) {
+      throw FormatException('Rehearsal date is missing or invalid.');
+    }
+    return parsed;
+  }
+
+  Future<List<Conflict>> _conflicts(
+    RehearsalInput input, {
+    String? excludeRehearsalId,
+  }) async {
+    final snapshot = await _rehearsals
+        .where('status', isEqualTo: RehearsalStatus.confirmed.name)
+        .get();
+    final conflicts = <Conflict>[];
+    for (final document in snapshot.docs) {
+      if (document.id == excludeRehearsalId) continue;
+      final data = document.data();
+      final start = _date(data['startAt']);
+      final end = _date(data['endAt']);
+      if (end.isAfter(input.startAt) && start.isBefore(input.endAt)) {
+        if (data['venueId'] == input.venueId) {
+          conflicts.add(
+            Conflict(
+              type: ConflictType.venue,
+              resourceId: input.venueId,
+              resourceName: input.venueId,
+              conflictingRehearsalId: document.id,
+              conflictingStart: start,
+              conflictingEnd: end,
+            ),
+          );
+        }
+        final participants = List<String>.from(
+          data['participantIds'] ?? const <String>[],
+        );
+        for (final participantId in input.participantIds.where(
+          participants.contains,
+        )) {
+          conflicts.add(
+            Conflict(
+              type: ConflictType.cast,
+              resourceId: participantId,
+              resourceName: participantId,
+              conflictingRehearsalId: document.id,
+              conflictingStart: start,
+              conflictingEnd: end,
+            ),
+          );
+        }
+      }
+    }
+    return conflicts;
+  }
+
+  Rehearsal _fromDocument(DocumentSnapshot<Map<String, dynamic>> document) {
+    final data = document.data();
+    if (data == null) {
+      throw StateError('Rehearsal document ${document.id} has no data.');
+    }
+    return Rehearsal.fromMap(Map<String, dynamic>.from(data), document.id);
+  }
 
   @override
   Future<RehearsalSaveResult> createRehearsal(
     RehearsalInput input, {
     AppUser? user,
   }) async {
-    final currentUser = user ?? await _authService.currentUser();
-    if (currentUser == null || currentUser.role != UserRole.director) {
-      throw RevoException(
-        RevoErrorCode.permissionDenied,
-        'Only Directors are authorized to schedule rehearsals (FR-05).',
-      );
+    final userId = await _requireManager();
+    _validate(input);
+    final conflicts = await _conflicts(input);
+    if (conflicts.isNotEmpty) {
+      return RehearsalSaveResult(conflicts: conflicts);
     }
-
-    final isOffline =
-        SyncStatusService.instance.connectivity == ConnectivityState.offline;
-
-    final newRehearsal = Rehearsal(
-      rehearsalId: 'reh_${DateTime.now().millisecondsSinceEpoch}',
+    final ref = _rehearsals.doc();
+    final now = DateTime.now();
+    final rehearsal = Rehearsal(
+      rehearsalId: ref.id,
       productionId: input.productionId,
       venueId: input.venueId,
       startAt: input.startAt,
       endAt: input.endAt,
       participantIds: input.participantIds,
       status: RehearsalStatus.confirmed,
-      clientPending: isOffline,
-      createdBy: currentUser.userId,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+      clientPending: false,
+      createdBy: userId,
+      createdAt: now,
+      updatedAt: now,
+      title: input.title,
+      notes: input.notes,
     );
-
-    _scheduleService.addRehearsal(newRehearsal);
-
-    return RehearsalSaveResult(
-      rehearsal: newRehearsal,
-      conflicts: [],
-    );
+    await ref.set(rehearsal.toMap());
+    return RehearsalSaveResult(rehearsal: rehearsal);
   }
 
   @override
@@ -63,18 +158,18 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
     RehearsalInput input, {
     AppUser? user,
   }) async {
-    final currentUser = user ?? await _authService.currentUser();
-    if (currentUser == null || currentUser.role != UserRole.director) {
-      throw RevoException(
-        RevoErrorCode.permissionDenied,
-        'Only Directors are authorized to modify rehearsals.',
-      );
+    await _requireManager();
+    _validate(input);
+    final ref = _rehearsals.doc(rehearsalId);
+    final existingSnapshot = await ref.get();
+    if (!existingSnapshot.exists) {
+      throw RevoException(RevoErrorCode.notFound, 'Rehearsal not found.');
     }
-
-    final isOffline =
-        SyncStatusService.instance.connectivity == ConnectivityState.offline;
-
-    final existing = await getRehearsal(rehearsalId);
+    final existing = _fromDocument(existingSnapshot);
+    final conflicts = await _conflicts(input, excludeRehearsalId: rehearsalId);
+    if (conflicts.isNotEmpty) {
+      return RehearsalSaveResult(conflicts: conflicts);
+    }
     final updated = Rehearsal(
       rehearsalId: existing.rehearsalId,
       productionId: input.productionId,
@@ -83,40 +178,39 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
       endAt: input.endAt,
       participantIds: input.participantIds,
       status: existing.status,
-      clientPending: isOffline,
+      clientPending: existing.clientPending,
       createdBy: existing.createdBy,
       createdAt: existing.createdAt,
       updatedAt: DateTime.now(),
+      title: input.title ?? existing.title,
+      notes: input.notes ?? existing.notes,
     );
-
-    _scheduleService.updateRehearsal(updated);
-
-    return RehearsalSaveResult(
-      rehearsal: updated,
-      conflicts: [],
-    );
+    await ref.set(updated.toMap());
+    return RehearsalSaveResult(rehearsal: updated);
   }
 
   @override
-  Future<void> cancelRehearsal(String rehearsalId, {AppUser? user}) async {
-    final currentUser = user ?? await _authService.currentUser();
-    if (currentUser == null || currentUser.role != UserRole.director) {
-      throw RevoException(
-        RevoErrorCode.permissionDenied,
-        'Only Directors can cancel scheduled rehearsals (BR-08).',
-      );
+  Future<void> cancelRehearsal(
+    String rehearsalId, {
+    AppUser? user,
+  }) async {
+    await _requireManager();
+    final ref = _rehearsals.doc(rehearsalId);
+    if (!(await ref.get()).exists) {
+      throw RevoException(RevoErrorCode.notFound, 'Rehearsal not found.');
     }
-
-    _scheduleService.cancelRehearsal(rehearsalId);
+    await ref.update({
+      'status': RehearsalStatus.cancelled.name,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
   }
 
   @override
   Future<Rehearsal> getRehearsal(String rehearsalId) async {
-    final rawList = _scheduleService.rawRehearsals;
-    final index = rawList.indexWhere((r) => r.rehearsalId == rehearsalId);
-    if (index == -1) {
+    final document = await _rehearsals.doc(rehearsalId).get();
+    if (!document.exists) {
       throw RevoException(RevoErrorCode.notFound, 'Rehearsal not found.');
     }
-    return rawList[index];
+    return _fromDocument(document);
   }
 }
