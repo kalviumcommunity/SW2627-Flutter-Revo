@@ -133,6 +133,23 @@ class FirebaseVenueRepository implements VenueRepository {
     await document.update(_mapInput(input));
   }
 
+    @override
+  Future<void> deleteVenue(String venueId) async {
+    await _requireAdmin();
+
+    final document = _venues.doc(venueId);
+    final snapshot = await document.get();
+
+    if (!snapshot.exists) {
+      throw RevoException(
+        RevoErrorCode.notFound,
+        'Venue not found.',
+      );
+    }
+
+    await document.delete();
+  }
+
   @override
   Future<void> toggleStatus(String venueId) async {
     await _requireAdmin();

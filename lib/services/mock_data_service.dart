@@ -354,6 +354,11 @@ class MockDataService {
     }
   }
 
+  Future<void> deleteProduction(String productionId) async {
+    _productions.removeWhere((p) => p.productionId == productionId);
+    _notifyAll();
+  }
+
   // ── Venue Operations ───────────────────────────────────────────────────────
 
   Stream<List<Venue>> watchVenues() {
@@ -405,6 +410,11 @@ class MockDataService {
       );
       _notifyAll();
     }
+  }
+
+  Future<void> deleteVenue(String venueId) async {
+    _venues.removeWhere((v) => v.venueId == venueId);
+    _notifyAll();
   }
 
   // ── Rehearsal & Related Operations ─────────────────────────────────────────

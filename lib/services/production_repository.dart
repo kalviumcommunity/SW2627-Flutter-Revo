@@ -43,6 +43,9 @@ abstract class ProductionRepository {
     ProductionStatus status,
   );
 
+  /// Delete an existing production.
+  Future<void> deleteProduction(String productionId);
+
   // ── Associated Production Metadata ─────────────────────────────────────────
 
   /// Resolve director display name from [directorId].

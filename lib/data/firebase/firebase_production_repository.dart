@@ -219,6 +219,24 @@ class FirebaseProductionRepository implements ProductionRepository {
     });
   }
 
+
+    @override
+  Future<void> deleteProduction(String productionId) async {
+    await _requireProductionAccess(productionId);
+
+    final document = _productions.doc(productionId);
+    final snapshot = await document.get();
+
+    if (!snapshot.exists) {
+      throw RevoException(
+        RevoErrorCode.notFound,
+        'Production not found.',
+      );
+    }
+
+    await document.delete();
+  }
+
   @override
   Future<String> getDirectorName(String directorId) => getUserName(directorId);
 

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 import '../../core/constants/revo_colors.dart';
 import '../../core/constants/revo_spacing.dart';
 import '../../core/constants/revo_typography.dart';
@@ -6,6 +8,8 @@ import '../../core/enums/revo_enums.dart';
 import '../../models/app_user.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/mock_data_service.dart';
+import '../../services/firebase_production_repository.dart';
+import '../../services/firebase_venue_repository.dart';
 import '../../services/mock_production_repository.dart';
 import '../../services/mock_venue_repository.dart';
 import '../../services/production_repository.dart';
@@ -45,8 +49,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void initState() {
     super.initState();
     _productionRepository =
-        widget.productionRepository ?? MockProductionRepository();
-    _venueRepository = widget.venueRepository ?? MockVenueRepository();
+        widget.productionRepository ??
+        (Firebase.apps.isNotEmpty
+            ? FirebaseProductionRepository()
+            : MockProductionRepository());
+    _venueRepository =
+        widget.venueRepository ??
+        (Firebase.apps.isNotEmpty
+            ? FirebaseVenueRepository()
+            : MockVenueRepository());
   }
 
   @override
@@ -106,10 +117,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 value: UserRole.cast,
                 child: Text('Role: Cast Member'),
               ),
-              PopupMenuItem(
-                value: UserRole.admin,
-                child: Text('Role: Admin'),
-              ),
+              PopupMenuItem(value: UserRole.admin, child: Text('Role: Admin')),
             ],
           ),
           IconButton(
@@ -173,9 +181,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           const SizedBox(height: 4),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.tertiary.withValues(alpha: 0.2),
+                              color: theme.colorScheme.tertiary.withValues(
+                                alpha: 0.2,
+                              ),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
@@ -192,7 +204,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
-                                    color: theme.colorScheme.onTertiaryContainer,
+                                    color:
+                                        theme.colorScheme.onTertiaryContainer,
                                     letterSpacing: 0.5,
                                   ),
                                 ),
@@ -217,7 +230,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 children: [
                   Text(
                     'Organization Overview',
-                    style: RevoTypography.title2.copyWith(fontWeight: FontWeight.w700),
+                    style: RevoTypography.title2.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   Text(
                     'Live Derived Metrics',
@@ -305,7 +320,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
               // Section: Management Workflows
               Text(
                 'Theatre Operations & Management',
-                style: RevoTypography.title2.copyWith(fontWeight: FontWeight.w700),
+                style: RevoTypography.title2.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: RevoSpacing.md),
 
@@ -313,7 +330,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               _buildNavigationCard(
                 icon: Icons.movie_filter_outlined,
                 title: 'Productions Catalog & Scheduling',
-                subtitle: 'Browse all $totalProds productions, inspect details, cast & rehearsals.',
+                subtitle:
+                    'Browse all $totalProds productions, inspect details, cast & rehearsals.',
                 badgeText: '$activeProds ACTIVE',
                 badgeColor: RevoColors.primary,
                 onTap: () {
@@ -379,7 +397,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Role guards verified. Use switch icon in top bar to test role switching.'),
+                      content: Text(
+                        'Role guards verified. Use switch icon in top bar to test role switching.',
+                      ),
                       backgroundColor: RevoColors.primary,
                     ),
                   );
@@ -490,7 +510,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
             Expanded(
               child: Text(
                 title,
-                style: RevoTypography.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+                style: RevoTypography.bodyLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             Container(
@@ -514,10 +536,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
           padding: const EdgeInsets.only(top: 4.0),
           child: Text(
             subtitle,
-            style: RevoTypography.caption.copyWith(color: RevoColors.textSecondary),
+            style: RevoTypography.caption.copyWith(
+              color: RevoColors.textSecondary,
+            ),
           ),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: RevoColors.textMuted),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 14,
+          color: RevoColors.textMuted,
+        ),
         onTap: onTap,
       ),
     );
