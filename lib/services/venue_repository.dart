@@ -19,6 +19,9 @@ abstract class VenueRepository {
   /// Update an existing venue's details (Admin only).
   Future<void> updateVenue(String venueId, VenueInput input);
 
+  /// Delete an existing venue (Admin only).
+  Future<void> deleteVenue(String venueId);
+
   /// Toggle venue status between active and underMaintenance (Admin only).
   Future<void> toggleStatus(String venueId);
 

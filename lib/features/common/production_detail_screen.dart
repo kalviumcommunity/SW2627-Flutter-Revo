@@ -126,6 +126,130 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
     await _loadData();
   }
 
+  Future<void> _editProduction() async {
+    final production = _production;
+    if (production == null) return;
+    final nameController = TextEditingController(text: production.name);
+    final descriptionController =
+        TextEditingController(text: production.description);
+    var status = production.status;
+    final formKey = GlobalKey<FormState>();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Production'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Name'),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty
+                        ? 'Name is required.'
+                        : null,
+              ),
+              TextFormField(
+                controller: descriptionController,
+                decoration: const InputDecoration(labelText: 'Description'),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty
+                        ? 'Description is required.'
+                        : null,
+              ),
+              DropdownButtonFormField<ProductionStatus>(
+                initialValue: status,
+                decoration: const InputDecoration(labelText: 'Status'),
+                items: ProductionStatus.values
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(value.name.toUpperCase()),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) status = value;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (!(formKey.currentState?.validate() ?? false)) return;
+              try {
+                await widget.productionRepository.updateProduction(
+                  production.productionId,
+                  ProductionInput(
+                    name: nameController.text,
+                    description: descriptionController.text,
+                    startDate: production.startDate,
+                    endDate: production.endDate,
+                    status: status,
+                  ),
+                );
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext, true);
+                }
+              } catch (error) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text(error.toString())),
+                  );
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    nameController.dispose();
+    descriptionController.dispose();
+    if (saved == true && mounted) await _loadData();
+  }
+
+  Future<void> _deleteProduction() async {
+    final production = _production;
+    if (production == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete production?'),
+        content: Text('Delete "${production.name}" permanently?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await widget.productionRepository.deleteProduction(production.productionId);
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    }
+  }
+
   Color _getStatusColor(ProductionStatus status) {
     switch (status) {
       case ProductionStatus.rehearsing:
@@ -220,6 +344,20 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
           style: RevoTypography.title2.copyWith(fontWeight: FontWeight.w700),
         ),
         actions: [
+          if (isAssignedDirector || widget.user.role == UserRole.admin)
+            PopupMenuButton<String>(
+              onSelected: (action) {
+                if (action == 'edit') {
+                  _editProduction();
+                } else {
+                  _deleteProduction();
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit')),
+                PopupMenuItem(value: 'delete', child: Text('Delete')),
+              ],
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',

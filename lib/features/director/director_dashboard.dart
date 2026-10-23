@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../../core/constants/revo_colors.dart';
 import '../../core/constants/revo_spacing.dart';
 import '../../core/constants/revo_typography.dart';
@@ -7,6 +8,8 @@ import '../../models/app_user.dart';
 import '../../models/production.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/mock_data_service.dart';
+import '../../services/firebase_production_repository.dart';
+import '../../services/firebase_venue_repository.dart';
 import '../../services/mock_production_repository.dart';
 import '../../services/mock_venue_repository.dart';
 import '../../services/production_repository.dart';
@@ -56,8 +59,14 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
   void initState() {
     super.initState();
     _productionRepository =
-        widget.productionRepository ?? MockProductionRepository();
-    _venueRepository = widget.venueRepository ?? MockVenueRepository();
+        widget.productionRepository ??
+        (Firebase.apps.isNotEmpty
+            ? FirebaseProductionRepository()
+            : MockProductionRepository());
+    _venueRepository = widget.venueRepository ??
+        (Firebase.apps.isNotEmpty
+            ? FirebaseVenueRepository()
+            : MockVenueRepository());
   }
 
   String _formatDate(DateTime dt) {
