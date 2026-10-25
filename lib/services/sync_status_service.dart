@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import '../core/enums/revo_enums.dart';
 import '../core/errors/revo_exception.dart';
 import 'sync/freshness_calculator.dart';
@@ -33,6 +34,7 @@ class SyncStatusSnapshot {
 }
 
 typedef RemotePersistenceHandler = Future<bool> Function(PendingWriteOp op);
+typedef ReconnectRevalidationHandler = Future<void> Function();
 
 /// Centralized, reactive synchronization status service (FR-12, FR-13).
 /// Serves as the single source of truth for:
@@ -66,6 +68,9 @@ class SyncStatusService implements SyncService {
 
   final Map<String, PendingWriteOp> _pendingOps = {};
   RemotePersistenceHandler? _remoteHandler;
+  ReconnectRevalidationHandler? _reconnectRevalidator;
+  Future<void>? _revalidationInFlight;
+  Future<List<Conflict>>? _reconciliationInFlight;
 
   // Reactive StreamControllers
   final _connectivityController =
@@ -75,13 +80,12 @@ class SyncStatusService implements SyncService {
   final _pendingOpsController =
       StreamController<List<PendingWriteOp>>.broadcast();
   final _syncStateController = StreamController<SyncState>.broadcast();
-  final _snapshotController =
-      StreamController<SyncStatusSnapshot>.broadcast();
+  final _snapshotController = StreamController<SyncStatusSnapshot>.broadcast();
   final Map<String, StreamController<WriteSyncStatus>> _entityControllers = {};
 
   SyncStatusService._internal()
-      : _cacheStore = SyncCacheStore(),
-        freshnessThreshold = FreshnessCalculator.defaultFreshnessThreshold {
+    : _cacheStore = SyncCacheStore(),
+      freshnessThreshold = FreshnessCalculator.defaultFreshnessThreshold {
     _restoreFromCache();
   }
 
@@ -109,16 +113,28 @@ class SyncStatusService implements SyncService {
   bool get hasPendingWrites => pendingCount > 0;
 
   SyncStatusSnapshot get currentSnapshot => SyncStatusSnapshot(
-        connectivity: _connectivity,
-        freshness: _freshness,
-        lastSyncedAt: _lastSyncedAt,
-        pendingCount: pendingCount,
-        lastSyncError: _lastSyncError,
-        legacySyncState: _computeLegacySyncState(),
-      );
+    connectivity: _connectivity,
+    freshness: _freshness,
+    lastSyncedAt: _lastSyncedAt,
+    pendingCount: pendingCount,
+    lastSyncError: _lastSyncError,
+    legacySyncState: _computeLegacySyncState(),
+  );
 
   void setRemoteHandler(RemotePersistenceHandler? handler) {
     _remoteHandler = handler;
+  }
+
+  /// Registers the authoritative session/data check that must run before
+  /// pending writes are replayed after connectivity is restored.
+  void setReconnectRevalidator(ReconnectRevalidationHandler? handler) {
+    _reconnectRevalidator = handler;
+  }
+
+  void clearReconnectRevalidator(ReconnectRevalidationHandler handler) {
+    if (identical(_reconnectRevalidator, handler)) {
+      _reconnectRevalidator = null;
+    }
   }
 
   // ── Reactive Streams ────────────────────────────────────────────────────────
@@ -166,7 +182,9 @@ class SyncStatusService implements SyncService {
   Stream<WriteSyncStatus> watchEntityStatus(String entityId) async* {
     yield getEntityStatus(entityId);
     _entityControllers.putIfAbsent(
-        entityId, () => StreamController<WriteSyncStatus>.broadcast());
+      entityId,
+      () => StreamController<WriteSyncStatus>.broadcast(),
+    );
     yield* _entityControllers[entityId]!.stream;
   }
 
@@ -185,8 +203,41 @@ class SyncStatusService implements SyncService {
     // Scenario D: Reconnection: Online transition triggers pending write sync
     if (previousState == ConnectivityState.offline &&
         newState == ConnectivityState.online) {
-      reconcilePending();
+      unawaited(revalidateOnReconnect());
     }
+  }
+
+  /// Revalidates the authenticated session and remote data once per online
+  /// transition. Failed validation leaves pending work intact for retry.
+  Future<void> revalidateOnReconnect() {
+    final inFlight = _revalidationInFlight;
+    if (inFlight != null) return inFlight;
+
+    final future = _runReconnectRevalidation();
+    _revalidationInFlight = future;
+    unawaited(
+      future.then(
+        (_) => _clearRevalidation(future),
+        onError: (Object _, StackTrace _) => _clearRevalidation(future),
+      ),
+    );
+    return future;
+  }
+
+  void _clearRevalidation(Future<void> future) {
+    if (identical(_revalidationInFlight, future)) {
+      _revalidationInFlight = null;
+    }
+  }
+
+  Future<void> _runReconnectRevalidation() async {
+    try {
+      await _reconnectRevalidator?.call();
+    } catch (error) {
+      recordSyncFailure(error.toString());
+      return;
+    }
+    await reconcilePending();
   }
 
   // ── Freshness Evaluation (FR-12) ───────────────────────────────────────────
@@ -269,7 +320,8 @@ class SyncStatusService implements SyncService {
     required Map<String, dynamic> payload,
     String? customOperationId,
   }) async {
-    final opId = customOperationId ??
+    final opId =
+        customOperationId ??
         'op_${DateTime.now().millisecondsSinceEpoch}_$entityId';
 
     // Idempotency: if already queued, return existing
@@ -364,7 +416,32 @@ class SyncStatusService implements SyncService {
 
   /// Called on reconnect (or manual trigger): iterates and synchronizes all pending writes safely.
   @override
-  Future<List<Conflict>> reconcilePending({RemotePersistenceHandler? onSyncOp}) async {
+  Future<List<Conflict>> reconcilePending({
+    RemotePersistenceHandler? onSyncOp,
+  }) {
+    final inFlight = _reconciliationInFlight;
+    if (inFlight != null) return inFlight;
+
+    final future = _reconcilePending(onSyncOp: onSyncOp);
+    _reconciliationInFlight = future;
+    unawaited(
+      future.then(
+        (_) => _clearReconciliation(future),
+        onError: (Object _, StackTrace _) => _clearReconciliation(future),
+      ),
+    );
+    return future;
+  }
+
+  void _clearReconciliation(Future<List<Conflict>> future) {
+    if (identical(_reconciliationInFlight, future)) {
+      _reconciliationInFlight = null;
+    }
+  }
+
+  Future<List<Conflict>> _reconcilePending({
+    RemotePersistenceHandler? onSyncOp,
+  }) async {
     if (onSyncOp != null) {
       _remoteHandler = onSyncOp;
     }
@@ -423,6 +500,9 @@ class SyncStatusService implements SyncService {
     _lastSyncError = null;
     _pendingOps.clear();
     _remoteHandler = null;
+    _reconnectRevalidator = null;
+    _revalidationInFlight = null;
+    _reconciliationInFlight = null;
     _cacheStore = customStore ?? SyncCacheStore(inMemoryOnly: inMemory);
     _restoreFromCache();
   }

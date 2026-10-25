@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -78,6 +79,86 @@ void main() {
 
       syncService.setConnectivity(ConnectivityState.online);
       expect(syncService.connectivity, ConnectivityState.online);
+    });
+
+    test('Reconnect runs session revalidation before pending writes', () async {
+      var revalidationCalls = 0;
+      var persistenceCalls = 0;
+      final revalidationCompleter = Completer<void>();
+      syncService.setReconnectRevalidator(() async {
+        revalidationCalls++;
+        await revalidationCompleter.future;
+      });
+      syncService.setRemoteHandler((_) async {
+        persistenceCalls++;
+        return true;
+      });
+      syncService.setConnectivity(ConnectivityState.offline);
+      await syncService.queuePendingWrite(
+        entityType: 'rehearsal',
+        entityId: 'reh_reconnect',
+        action: 'create',
+        payload: const {'title': 'Reconnect test'},
+      );
+
+      syncService.setConnectivity(ConnectivityState.online);
+      final revalidation = syncService.revalidateOnReconnect();
+      revalidationCompleter.complete();
+      await revalidation;
+
+      expect(revalidationCalls, 1);
+      expect(persistenceCalls, 1);
+      expect(syncService.pendingOps, isEmpty);
+    });
+
+    test('Repeated reconnect requests share one in-flight revalidation',
+        () async {
+      var calls = 0;
+      final completer = Completer<void>();
+      syncService.setReconnectRevalidator(() async {
+        calls++;
+        await completer.future;
+      });
+
+      syncService.setConnectivity(ConnectivityState.offline);
+      syncService.setConnectivity(ConnectivityState.online);
+      final first = syncService.revalidateOnReconnect();
+      final second = syncService.revalidateOnReconnect();
+      expect(identical(first, second), isTrue);
+
+      completer.complete();
+      await Future.wait([first, second]);
+      expect(calls, 1);
+    });
+
+    test('Failed reconnect revalidation preserves pending work and recovers',
+        () async {
+      var shouldFail = true;
+      var calls = 0;
+      syncService.setReconnectRevalidator(() async {
+        calls++;
+        if (shouldFail) {
+          throw StateError('Session expired');
+        }
+      });
+      syncService.setRemoteHandler((_) async => true);
+      syncService.setConnectivity(ConnectivityState.offline);
+      await syncService.queuePendingWrite(
+        entityType: 'rehearsal',
+        entityId: 'reh_failed_reconnect',
+        action: 'create',
+        payload: const {},
+      );
+
+      syncService.setConnectivity(ConnectivityState.online);
+      await syncService.revalidateOnReconnect();
+      expect(syncService.pendingOps, hasLength(1));
+      expect(syncService.lastSyncError, isNotNull);
+
+      shouldFail = false;
+      await syncService.revalidateOnReconnect();
+      expect(calls, 2);
+      expect(syncService.pendingOps, isEmpty);
     });
   });
 

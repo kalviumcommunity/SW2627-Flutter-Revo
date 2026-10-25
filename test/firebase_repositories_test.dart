@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +17,7 @@ import 'package:sw2627_flutter_revo_1/services/firebase_auth_service.dart';
 import 'package:sw2627_flutter_revo_1/services/firebase_schedule_service.dart';
 import 'package:sw2627_flutter_revo_1/services/rehearsal_repository.dart';
 import 'package:sw2627_flutter_revo_1/services/schedule_service.dart';
+import 'package:sw2627_flutter_revo_1/services/sync_status_service.dart';
 
 class TestIdentityProvider implements AuthIdentityProvider {
   TestIdentityProvider(this.identity);
@@ -512,6 +515,99 @@ void main() {
       expect(snapshot.items, isEmpty);
       expect(snapshot.syncState, SyncState.synced);
       await service.dispose();
+    },
+  );
+
+  test(
+    'recovers from a listener error before reconnecting without duplicates',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      final streamController =
+          StreamController<QuerySnapshot<Map<String, dynamic>>>.broadcast();
+      var streamFactoryCalls = 0;
+      final service = FirebaseScheduleService(
+        firestore: firestore,
+        identityProvider: TestIdentityProvider(
+          const AuthIdentity(
+            userId: 'director-1',
+            role: UserRole.director,
+            isFirebaseAuthenticated: true,
+          ),
+        ),
+        rehearsalStreamFactory: (_) {
+          streamFactoryCalls++;
+          return streamController.stream;
+        },
+      );
+      final snapshots = <ScheduleSnapshot>[];
+      final subscription = service
+          .watchProductionSchedule('production-1')
+          .listen(snapshots.add);
+      service.watchProductionSchedule('production-1').listen((_) {});
+      await pumpEventQueue();
+      expect(streamFactoryCalls, 1);
+
+      streamController.addError(StateError('listener failed'));
+      await pumpEventQueue();
+
+      await SyncStatusService.instance.revalidateOnReconnect();
+      expect(streamFactoryCalls, 2);
+      await SyncStatusService.instance.revalidateOnReconnect();
+      expect(streamFactoryCalls, 2);
+
+      await firestore.collection('rehearsals').doc('rehearsal-1').set({
+        'productionId': 'production-1',
+        'venueId': 'main-stage',
+        'startAt': '2026-10-15T10:00:00.000Z',
+        'endAt': '2026-10-15T12:00:00.000Z',
+        'participantIds': ['director-1'],
+        'status': 'confirmed',
+        'clientPending': false,
+        'createdBy': 'director-1',
+        'createdAt': '2026-10-01T00:00:00.000Z',
+        'updatedAt': '2026-10-01T00:00:00.000Z',
+      });
+      streamController.add(await firestore.collection('rehearsals').get());
+      await pumpEventQueue();
+      expect(snapshots.last.items.single.rehearsalId, 'rehearsal-1');
+
+      await subscription.cancel();
+      await service.dispose();
+      await streamController.close();
+      await SyncStatusService.instance.revalidateOnReconnect();
+      expect(streamFactoryCalls, 2);
+    },
+  );
+
+  test(
+    'does not start a listener when disposed during reconnect revalidation',
+    () async {
+      final firestore = FakeFirebaseFirestore();
+      final readCompleter = Completer<QuerySnapshot<Map<String, dynamic>>>();
+      var streamFactoryCalls = 0;
+      final service = FirebaseScheduleService(
+        firestore: firestore,
+        identityProvider: TestIdentityProvider(
+          const AuthIdentity(
+            userId: 'director-1',
+            role: UserRole.director,
+            isFirebaseAuthenticated: true,
+          ),
+        ),
+        rehearsalReadFactory: (_) => readCompleter.future,
+        rehearsalStreamFactory: (_) {
+          streamFactoryCalls++;
+          return const Stream<QuerySnapshot<Map<String, dynamic>>>.empty();
+        },
+      );
+
+      final revalidation = SyncStatusService.instance.revalidateOnReconnect();
+      await pumpEventQueue();
+      await service.dispose();
+      readCompleter.complete(await firestore.collection('rehearsals').get());
+      await revalidation;
+
+      expect(streamFactoryCalls, 0);
     },
   );
 }
