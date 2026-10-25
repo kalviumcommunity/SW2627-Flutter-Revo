@@ -7,6 +7,7 @@ import '../models/app_user.dart';
 import '../models/rehearsal.dart';
 import 'auth_identity.dart';
 import 'firebase_auth_service.dart';
+import 'conflict_service.dart';
 import 'rehearsal_repository.dart';
 
 class FirebaseRehearsalRepository implements RehearsalRepository {
@@ -15,7 +16,8 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
     FirebaseAuth? auth,
     AuthIdentityProvider? identityProvider,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _identityProvider = identityProvider ??
+       _identityProvider =
+           identityProvider ??
            (auth != null
                ? FirebaseAuthIdentityProvider(
                    auth: auth,
@@ -36,8 +38,7 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
         'Authentication is required.',
       );
     }
-    if (identity.role != UserRole.director &&
-        identity.role != UserRole.admin) {
+    if (identity.role != UserRole.director && identity.role != UserRole.admin) {
       throw RevoException(
         RevoErrorCode.permissionDenied,
         'Only directors or admins can manage rehearsals.',
@@ -50,9 +51,10 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
     if (input.productionId.trim().isEmpty || input.venueId.trim().isEmpty) {
       throw ArgumentError('Production and venue are required.');
     }
-    if (!input.startAt.isBefore(input.endAt)) {
-      throw ArgumentError('Rehearsal start must be before its end.');
-    }
+    ConflictDetectionRules.validateInterval(
+      startAt: input.startAt,
+      endAt: input.endAt,
+    );
   }
 
   DateTime _date(Object? value) {
@@ -77,7 +79,12 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
       final data = document.data();
       final start = _date(data['startAt']);
       final end = _date(data['endAt']);
-      if (end.isAfter(input.startAt) && start.isBefore(input.endAt)) {
+      if (ConflictDetectionRules.intervalsOverlap(
+        startA: input.startAt,
+        endA: input.endAt,
+        startB: start,
+        endB: end,
+      )) {
         if (data['venueId'] == input.venueId) {
           conflicts.add(
             Conflict(
@@ -93,7 +100,7 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
         final participants = List<String>.from(
           data['participantIds'] ?? const <String>[],
         );
-        for (final participantId in input.participantIds.where(
+        for (final participantId in input.participantIds.toSet().where(
           participants.contains,
         )) {
           conflicts.add(
@@ -102,6 +109,8 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
               resourceId: participantId,
               resourceName: participantId,
               conflictingRehearsalId: document.id,
+              proposedStart: input.startAt,
+              proposedEnd: input.endAt,
               conflictingStart: start,
               conflictingEnd: end,
             ),
@@ -190,10 +199,7 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
   }
 
   @override
-  Future<void> cancelRehearsal(
-    String rehearsalId, {
-    AppUser? user,
-  }) async {
+  Future<void> cancelRehearsal(String rehearsalId, {AppUser? user}) async {
     await _requireManager();
     final ref = _rehearsals.doc(rehearsalId);
     if (!(await ref.get()).exists) {
