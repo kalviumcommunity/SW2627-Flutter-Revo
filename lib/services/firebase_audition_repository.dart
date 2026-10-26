@@ -101,8 +101,8 @@ class FirebaseAuditionRepository implements AuditionRepository {
     }
     await ref.update({
       'productionId': input.productionId,
-      'startAt': input.startAt.toIso8601String(),
-      'endAt': input.endAt.toIso8601String(),
+      'startAt': Timestamp.fromDate(input.startAt), // Bug 3 fix: must store as Timestamp, not ISO string (fromMap uses Timestamp)
+      'endAt': Timestamp.fromDate(input.endAt),
       'venueId': input.venueId,
       'availableRoles': input.availableRoles,
     });

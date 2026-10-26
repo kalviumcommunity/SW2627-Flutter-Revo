@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../../core/constants/revo_colors.dart';
 import '../../core/constants/revo_spacing.dart';
 import '../../core/constants/revo_typography.dart';
@@ -6,6 +7,7 @@ import '../../core/widgets/app_brand_header.dart';
 import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../services/auth_service.dart';
+import '../../services/firebase_auth_service.dart';
 import '../../services/mock_auth_service.dart';
 
 /// FR-01 & Issue #8: Revo Login Screen.
@@ -37,7 +39,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _auth = widget.authService ?? MockAuthService();
+    _auth = widget.authService ??
+        (Firebase.apps.isNotEmpty ? FirebaseAuthService() : MockAuthService());
   }
 
   @override
@@ -76,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceFirst('RevoException: ', '').replaceFirst('Exception: ', '');
+          _errorMessage = _formatErrorMessage(e);
         });
       }
     } finally {
@@ -86,6 +89,39 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    FocusScope.of(context).unfocus();
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await _auth.signInWithGoogle();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = _formatErrorMessage(e);
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  String _formatErrorMessage(Object e) {
+    if (e is RevoException) {
+      return e.message;
+    }
+    return e.toString().replaceFirst('Exception: ', '');
   }
 
   @override
@@ -235,6 +271,86 @@ class _LoginScreenState extends State<LoginScreen> {
                             isLoading: _isLoading,
                             icon: Icons.login_rounded,
                             onPressed: _handleLogin,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // OR Divider
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Divider(
+                                  color: RevoColors.surfaceDim,
+                                  thickness: 1,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Text(
+                                  'OR',
+                                  style: RevoTypography.captionBadge.copyWith(
+                                    color: RevoColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Divider(
+                                  color: RevoColors.surfaceDim,
+                                  thickness: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Google Sign-In Button
+                          OutlinedButton(
+                            onPressed: _isLoading ? null : _handleGoogleSignIn,
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: const Color(0xFF1F1F1F),
+                              side: const BorderSide(color: Color(0xFF747775), width: 1),
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              elevation: 1,
+                              shadowColor: Colors.black.withValues(alpha: 0.1),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Styled Google "G" icon
+                                Container(
+                                  width: 22,
+                                  height: 22,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  child: const Text(
+                                    'G',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF4285F4),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Sign in with Google',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1F1F1F),
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

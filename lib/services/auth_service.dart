@@ -14,6 +14,7 @@ abstract class AuthService {
     required String email,
     required String password,
   });
+  Future<AppUser> signInWithGoogle({UserRole defaultRole = UserRole.cast});
   Future<void> logout();
   Future<AppUser?> currentUser(); // includes role from users/{uid}
 }

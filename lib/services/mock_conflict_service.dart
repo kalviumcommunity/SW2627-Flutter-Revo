@@ -63,7 +63,15 @@ class MockConflictService implements ConflictService {
     required List<String> participantIds,
     String? excludeRehearsalId,
   }) async {
-    ConflictDetectionRules.validateInterval(startAt: startAt, endAt: endAt);
+    // Bug 4 fix: Return empty list for invalid intervals instead of throwing.
+    // The repository layer calls validateInterval() before check(), so strict
+    // validation is still enforced on all confirmed rehearsal paths. Returning
+    // [] here prevents partial UI date-picker states from crashing the screen.
+    try {
+      ConflictDetectionRules.validateInterval(startAt: startAt, endAt: endAt);
+    } on RevoException {
+      return [];
+    }
 
     final conflicts = <Conflict>[];
     final allRehearsals = _dataService.getAllRehearsals();

@@ -219,8 +219,7 @@ class FirebaseProductionRepository implements ProductionRepository {
     });
   }
 
-
-    @override
+  @override
   Future<void> deleteProduction(String productionId) async {
     await _requireProductionAccess(productionId);
 

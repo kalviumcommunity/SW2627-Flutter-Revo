@@ -4,7 +4,7 @@ import '../models/app_user.dart';
 import '../models/rehearsal.dart';
 import 'auth_service.dart';
 import 'conflict_service.dart';
-import 'firebase_auth_service.dart';
+import 'mock_auth_service.dart';
 import 'firebase_schedule_service.dart';
 import 'mock_conflict_service.dart';
 import 'mock_data_service.dart';
@@ -26,7 +26,7 @@ class MockRehearsalRepository implements RehearsalRepository {
       return MockRehearsalRepository._custom(
         dataService ?? MockDataService(),
         conflictService ?? MockConflictService(),
-        authService ?? FirebaseAuthService(),
+        authService ?? MockAuthService(),
       );
     }
     return _instance;
@@ -39,7 +39,7 @@ class MockRehearsalRepository implements RehearsalRepository {
   MockRehearsalRepository._internal()
       : _dataService = MockDataService(),
         _conflictService = MockConflictService(),
-        _authService = FirebaseAuthService();
+        _authService = MockAuthService();
 
   MockRehearsalRepository._custom(
     this._dataService,

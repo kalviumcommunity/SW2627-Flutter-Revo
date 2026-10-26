@@ -186,6 +186,63 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
   }
 
   @override
+  Future<AppUser> signInWithGoogle({UserRole defaultRole = UserRole.cast}) async {
+    if (_unavailable) {
+      throw RevoException(
+        RevoErrorCode.unauthenticated,
+        'Firebase has not been initialized.',
+      );
+    }
+    if (isDemoMode) {
+      final user = _demoUsers['dir_101'] ?? _demoUsers.values.first;
+      _demoCurrentUser = user;
+      _demoAuthController.add(user);
+      return user;
+    }
+
+    try {
+      final googleProvider = GoogleAuthProvider();
+      final credential = await _auth!.signInWithPopup(googleProvider);
+      final firebaseUser = credential.user;
+      if (firebaseUser == null) {
+        throw RevoException(
+          RevoErrorCode.unauthenticated,
+          'Google Sign-In was cancelled or failed.',
+        );
+      }
+
+      // Check if user profile exists in Firestore
+      final userDoc = await _firestore!.collection('users').doc(firebaseUser.uid).get();
+      if (!userDoc.exists) {
+        final newProfile = AppUser(
+          userId: firebaseUser.uid,
+          name: firebaseUser.displayName ?? firebaseUser.email?.split('@').first ?? 'Google User',
+          email: firebaseUser.email ?? '',
+          role: defaultRole,
+          createdAt: DateTime.now().toUtc(),
+        );
+        await _firestore!.collection('users').doc(firebaseUser.uid).set(newProfile.toMap());
+        return newProfile;
+      }
+
+      final profile = await _profileForFirebaseUser(firebaseUser);
+      if (profile == null) {
+        throw RevoException(
+          RevoErrorCode.notFound,
+          'User profile could not be loaded from Firestore.',
+        );
+      }
+      return profile;
+    } catch (e) {
+      if (e is RevoException) rethrow;
+      throw RevoException(
+        RevoErrorCode.unauthenticated,
+        'Google Sign-In failed: $e',
+      );
+    }
+  }
+
+  @override
   Future<AppUser> register({
     required String name,
     required String email,
@@ -235,7 +292,7 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
       userId: firebaseUser.uid,
       name: name.trim(),
       email: email.trim(),
-      role: UserRole.cast,
+      role: role, // Bug 2 fix: use the supplied role instead of always defaulting to UserRole.cast
       createdAt: DateTime.now(),
     );
     try {
@@ -244,7 +301,7 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
           .doc(firebaseUser.uid)
           .set(profile.toMap());
     } catch (_) {
-      await _auth.signOut();
+      await _auth!.signOut(); // Bug 1 fix: _auth is nullable, must use ! operator
       rethrow;
     }
     return profile;

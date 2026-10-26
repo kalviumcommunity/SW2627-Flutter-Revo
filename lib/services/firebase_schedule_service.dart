@@ -196,7 +196,12 @@ class FirebaseScheduleService implements ScheduleService {
 
     unawaited(
       recovery.then<void>(
-        (_) => clearRecoveryReferences(),
+        (_) {
+          clearRecoveryReferences();
+          // Bug 5 fix: restart the listener after the broken subscription is cancelled.
+          // Without this call the schedule stream goes permanently silent after any error.
+          unawaited(_startFirestoreListener());
+        },
         onError: (Object _, StackTrace _) {
           clearRecoveryReferences();
         },

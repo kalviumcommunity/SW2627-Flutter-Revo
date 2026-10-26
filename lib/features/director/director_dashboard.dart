@@ -8,8 +8,8 @@ import '../../models/app_user.dart';
 import '../../models/production.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/mock_data_service.dart';
-import '../../services/firebase_production_repository.dart';
-import '../../services/firebase_venue_repository.dart';
+import '../../data/firebase/firebase_production_repository.dart';
+import '../../data/firebase/firebase_venue_repository.dart';
 import '../../services/mock_production_repository.dart';
 import '../../services/mock_venue_repository.dart';
 import '../../services/production_repository.dart';
@@ -54,10 +54,13 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
   final MockDataService _dataService = MockDataService();
   late final ProductionRepository _productionRepository;
   late final VenueRepository _venueRepository;
+  // Bug 6 fix: instantiate authService once in initState, not inside build() on every frame.
+  late final FirebaseAuthService _authService;
 
   @override
   void initState() {
     super.initState();
+    _authService = FirebaseAuthService();
     _productionRepository =
         widget.productionRepository ??
         (Firebase.apps.isNotEmpty
@@ -87,7 +90,6 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final authService = FirebaseAuthService();
     final metrics = _dataService.getDirectorMetrics(widget.user.userId);
 
     final myProdsCount = metrics['myProductionsCount'] as int? ?? 0;
@@ -135,7 +137,7 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
             icon: const Icon(Icons.swap_horiz),
             tooltip: 'Switch Demo Role Guard',
             onSelected: (role) {
-              authService.switchUserRole(role);
+              _authService.switchUserRole(role);
             },
             itemBuilder: (context) => const [
               PopupMenuItem(
@@ -156,7 +158,7 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
             icon: const Icon(Icons.logout),
             tooltip: 'Sign Out',
             onPressed: () async {
-              await authService.logout();
+              await _authService.logout();
             },
           ),
         ],

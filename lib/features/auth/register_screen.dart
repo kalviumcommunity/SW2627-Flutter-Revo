@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../../core/constants/revo_colors.dart';
 import '../../core/constants/revo_spacing.dart';
 import '../../core/constants/revo_typography.dart';
@@ -7,6 +8,7 @@ import '../../core/widgets/app_brand_header.dart';
 import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../services/auth_service.dart';
+import '../../services/firebase_auth_service.dart';
 import '../../services/mock_auth_service.dart';
 
 /// FR-01 & Issue #8: Revo Register Screen.
@@ -43,7 +45,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
-    _auth = widget.authService ?? MockAuthService();
+    _auth = widget.authService ??
+        (Firebase.apps.isNotEmpty ? FirebaseAuthService() : MockAuthService());
   }
 
   @override

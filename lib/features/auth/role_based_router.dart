@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../../core/enums/revo_enums.dart';
 import '../../core/widgets/loading_indicator.dart';
 import '../../models/app_user.dart';
 import '../../services/auth_service.dart';
+import '../../services/firebase_auth_service.dart';
 import '../../services/mock_auth_service.dart';
 import '../admin/admin_dashboard.dart';
 import '../cast/cast_dashboard.dart';
@@ -36,7 +38,8 @@ class _RoleBasedRouterState extends State<RoleBasedRouter> {
   @override
   void initState() {
     super.initState();
-    _authService = widget.authService ?? MockAuthService();
+    _authService = widget.authService ??
+        (Firebase.apps.isNotEmpty ? FirebaseAuthService() : MockAuthService());
   }
 
   void _toggleAuthScreen() {

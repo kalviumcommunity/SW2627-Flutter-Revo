@@ -494,6 +494,11 @@ class SyncStatusService implements SyncService {
 
   /// Complete reset for test isolation
   void resetForTesting({SyncCacheStore? customStore, bool inMemory = true}) {
+    // Close all per-entity stream controllers to prevent leaks
+    for (final ctrl in _entityControllers.values) {
+      ctrl.close();
+    }
+    _entityControllers.clear();
     _connectivity = ConnectivityState.online;
     _freshness = DataFreshness.unknown;
     _lastSyncedAt = null;
@@ -506,4 +511,20 @@ class SyncStatusService implements SyncService {
     _cacheStore = customStore ?? SyncCacheStore(inMemoryOnly: inMemory);
     _restoreFromCache();
   }
+
+  /// Closes all broadcast StreamControllers. Call when the app is torn down
+  /// or during full service disposal.
+  void dispose() {
+    for (final ctrl in _entityControllers.values) {
+      ctrl.close();
+    }
+    _entityControllers.clear();
+    _connectivityController.close();
+    _freshnessController.close();
+    _lastSyncedController.close();
+    _pendingOpsController.close();
+    _syncStateController.close();
+    _snapshotController.close();
+  }
 }
+

@@ -119,6 +119,20 @@ class MockAuthService implements AuthService {
   }
 
   @override
+  Future<AppUser> signInWithGoogle({UserRole defaultRole = UserRole.cast}) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final defaultEmail = switch (defaultRole) {
+      UserRole.director => 'director@revo.com',
+      UserRole.admin => 'admin@revo.com',
+      UserRole.cast => 'cast@revo.com',
+    };
+    final user = _usersByEmail[defaultEmail] ?? _usersByEmail.values.first;
+    _currentUser = user;
+    _authStreamController.add(_currentUser);
+    return user;
+  }
+
+  @override
   Future<AppUser> register({
     required String name,
     required String email,

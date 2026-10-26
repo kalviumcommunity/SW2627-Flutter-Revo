@@ -7,8 +7,8 @@ import 'package:sw2627_flutter_revo_1/core/errors/revo_exception.dart';
 import 'package:sw2627_flutter_revo_1/models/production.dart';
 import 'package:sw2627_flutter_revo_1/models/venue.dart';
 import 'package:sw2627_flutter_revo_1/services/firebase_auth_service.dart';
-import 'package:sw2627_flutter_revo_1/services/firebase_production_repository.dart';
-import 'package:sw2627_flutter_revo_1/services/firebase_venue_repository.dart';
+import 'package:sw2627_flutter_revo_1/data/firebase/firebase_production_repository.dart';
+import 'package:sw2627_flutter_revo_1/data/firebase/firebase_venue_repository.dart';
 
 void main() {
   final authService = FirebaseAuthService.demo();

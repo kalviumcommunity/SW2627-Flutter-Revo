@@ -133,7 +133,7 @@ class FirebaseVenueRepository implements VenueRepository {
     await document.update(_mapInput(input));
   }
 
-    @override
+  @override
   Future<void> deleteVenue(String venueId) async {
     await _requireAdmin();
 

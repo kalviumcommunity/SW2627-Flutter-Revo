@@ -93,7 +93,10 @@ class FirebaseNotificationService implements NotificationService {
 
     return _notificationsController.stream.asyncMap((allNotifs) async {
       final currentUser = await _authService.currentUser();
-      final userId = currentUser?.userId ?? 'cast_201';
+      final userId = currentUser?.userId;
+      // Bug 4 fix: return empty list when no user is authenticated instead of
+      // falling back to the hardcoded 'cast_201' ID (data leakage between users).
+      if (userId == null) return const <AppNotification>[];
       final userNotifs =
           allNotifs.where((n) => n.userId == userId).toList()
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -133,7 +136,9 @@ class FirebaseNotificationService implements NotificationService {
   /// Mark all notifications as read for the current user.
   Future<void> markAllRead() async {
     final currentUser = await _authService.currentUser();
-    final userId = currentUser?.userId ?? 'cast_201';
+    // Bug 4 fix: do nothing when no user is authenticated (was using 'cast_201' fallback)
+    final userId = currentUser?.userId;
+    if (userId == null) return;
     for (int i = 0; i < _notifications.length; i++) {
       if (_notifications[i].userId == userId && !_notifications[i].read) {
         final n = _notifications[i];

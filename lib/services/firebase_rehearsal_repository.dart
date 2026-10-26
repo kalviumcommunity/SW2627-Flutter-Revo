@@ -57,6 +57,29 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
     );
   }
 
+  /// Bug 3 fix (BR-05): Verify the Director is assigned to the production.
+  /// Admins bypass this check. Throws [RevoException] with [RevoErrorCode.permissionDenied]
+  /// before any Firestore write is attempted, giving a clear user-facing message.
+  Future<void> _requireProductionAccess(String userId, String productionId) async {
+    final identity = await _identityProvider.currentIdentity();
+    if (identity == null) return; // already checked by _requireManager
+    if (identity.role == UserRole.admin) return;
+    final productionDoc = await _firestore.collection('productions').doc(productionId).get();
+    if (!productionDoc.exists) {
+      throw RevoException(
+        RevoErrorCode.notFound,
+        'Production "$productionId" was not found.',
+      );
+    }
+    final directorId = productionDoc.data()?['directorId']?.toString();
+    if (directorId != userId) {
+      throw RevoException(
+        RevoErrorCode.permissionDenied,
+        'Directors can only schedule rehearsals for their own productions.',
+      );
+    }
+  }
+
   DateTime _date(Object? value) {
     if (value is Timestamp) return value.toDate();
     final parsed = DateTime.tryParse(value?.toString() ?? '');
@@ -135,6 +158,7 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
     AppUser? user,
   }) async {
     final userId = await _requireManager();
+    await _requireProductionAccess(userId, input.productionId); // Bug 3 fix
     _validate(input);
     final conflicts = await _conflicts(input);
     if (conflicts.isNotEmpty) {
@@ -167,7 +191,8 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
     RehearsalInput input, {
     AppUser? user,
   }) async {
-    await _requireManager();
+    final userId = await _requireManager();
+    await _requireProductionAccess(userId, input.productionId); // Bug 3 fix
     _validate(input);
     final ref = _rehearsals.doc(rehearsalId);
     final existingSnapshot = await ref.get();
@@ -179,6 +204,23 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
     if (conflicts.isNotEmpty) {
       return RehearsalSaveResult(conflicts: conflicts);
     }
+    final now = DateTime.now();
+    final updatedTitle = input.title ?? existing.title;
+    final updatedNotes = input.notes ?? existing.notes;
+    // Bug 5 fix: Use ref.update() instead of ref.set() to avoid deleting
+    // fields not present in toMap() (e.g. null title/notes wipe old values).
+    await ref.update({
+      'productionId': input.productionId,
+      'venueId': input.venueId,
+      'startAt': Timestamp.fromDate(input.startAt),
+      'endAt': Timestamp.fromDate(input.endAt),
+      'participantIds': input.participantIds,
+      'status': existing.status.name,
+      'clientPending': existing.clientPending,
+      'updatedAt': Timestamp.fromDate(now),
+      'title': updatedTitle,
+      'notes': updatedNotes,
+    });
     final updated = Rehearsal(
       rehearsalId: existing.rehearsalId,
       productionId: input.productionId,
@@ -190,11 +232,10 @@ class FirebaseRehearsalRepository implements RehearsalRepository {
       clientPending: existing.clientPending,
       createdBy: existing.createdBy,
       createdAt: existing.createdAt,
-      updatedAt: DateTime.now(),
-      title: input.title ?? existing.title,
-      notes: input.notes ?? existing.notes,
+      updatedAt: now,
+      title: updatedTitle,
+      notes: updatedNotes,
     );
-    await ref.set(updated.toMap());
     return RehearsalSaveResult(rehearsal: updated);
   }
 
