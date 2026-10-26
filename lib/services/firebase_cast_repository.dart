@@ -34,21 +34,21 @@ class FirebaseCastRepository implements CastRepository {
     _roles.addAll([
       ProductionRole(
         roleId: 'role_101',
-        productionId: 'prod_1',
+        productionId: 'prod_101',
         name: 'Hamlet (Lead)',
         description: 'Prince of Denmark. Tragic protagonist requiring high emotional range.',
         status: RoleStatus.assigned,
       ),
       ProductionRole(
         roleId: 'role_102',
-        productionId: 'prod_1',
+        productionId: 'prod_101',
         name: 'Ophelia (Supporting)',
         description: 'Daughter of Polonius. Strong vocal and physical theatre skills required.',
         status: RoleStatus.open,
       ),
       ProductionRole(
         roleId: 'role_103',
-        productionId: 'prod_1',
+        productionId: 'prod_101',
         name: 'Claudius (Antagonist)',
         description: 'King of Denmark. Commandive stage presence.',
         status: RoleStatus.open,
@@ -59,9 +59,9 @@ class FirebaseCastRepository implements CastRepository {
     _assignments.add(
       CastAssignment(
         assignmentId: 'asgn_101',
-        productionId: 'prod_1',
+        productionId: 'prod_101',
         roleId: 'role_101',
-        castMemberId: 'cast_201',
+        castMemberId: 'usr_cast_201',
         assignedAt: now.subtract(const Duration(days: 3)),
         status: AssignmentStatus.active,
       ),
@@ -224,27 +224,44 @@ class FirebaseCastRepository implements CastRepository {
 
   @override
   Stream<List<CastAssignment>> watchAssignments(String productionId) {
+    bool matchesProd(String candidate) {
+      if (candidate == productionId) return true;
+      if ((candidate == 'prod_1' && productionId == 'prod_101') ||
+          (candidate == 'prod_101' && productionId == 'prod_1')) {
+        return true;
+      }
+      return false;
+    }
+
     Future.microtask(() {
       final filtered = _assignments
-          .where((a) => a.productionId == productionId && a.status == AssignmentStatus.active)
+          .where((a) => matchesProd(a.productionId) && a.status == AssignmentStatus.active)
           .toList();
       _assignmentsController.add(filtered);
     });
 
     return _assignmentsController.stream.map((list) {
       return list
-          .where((a) => a.productionId == productionId && a.status == AssignmentStatus.active)
+          .where((a) => matchesProd(a.productionId) && a.status == AssignmentStatus.active)
           .toList();
     });
   }
 
   @override
   Stream<List<CastAssignment>> watchMyAssignments() {
+    Future.microtask(() => _notifyListeners());
     return _assignmentsController.stream.asyncMap((list) async {
       final currentUser = await _authService.currentUser();
       if (currentUser == null) return [];
+      final targetId = currentUser.userId;
+
+      bool matchesUser(String candidate) {
+        if (candidate == targetId) return true;
+        return candidate.replaceFirst('usr_', '') == targetId.replaceFirst('usr_', '');
+      }
+
       return list
-          .where((a) => a.castMemberId == currentUser.userId && a.status == AssignmentStatus.active)
+          .where((a) => matchesUser(a.castMemberId) && a.status == AssignmentStatus.active)
           .toList();
     });
   }

@@ -32,10 +32,10 @@ class FirebaseAuditionRepository implements AuditionRepository {
     _auditions.add(
       Audition(
         auditionId: 'aud_101',
-        productionId: 'prod_1',
+        productionId: 'prod_101',
         startAt: now.add(const Duration(days: 2)),
         endAt: now.add(const Duration(days: 2, hours: 4)),
-        venueId: 'ven_1',
+        venueId: 'ven_101',
         availableRoles: ['role_101', 'role_102'],
         status: AuditionStatus.open,
       ),
@@ -45,7 +45,7 @@ class FirebaseAuditionRepository implements AuditionRepository {
       Application(
         applicationId: 'app_101',
         auditionId: 'aud_101',
-        castMemberId: 'cast_201',
+        castMemberId: 'usr_cast_201',
         status: ApplicationStatus.submitted,
         submittedAt: now.subtract(const Duration(hours: 12)),
       ),
@@ -243,10 +243,18 @@ class FirebaseAuditionRepository implements AuditionRepository {
 
   @override
   Stream<List<Application>> watchMyApplications() {
+    Future.microtask(() => _notifyListeners());
     return _applicationsController.stream.asyncMap((list) async {
       final currentUser = await _authService.currentUser();
       if (currentUser == null) return [];
-      return list.where((app) => app.castMemberId == currentUser.userId).toList();
+      final targetId = currentUser.userId;
+
+      bool matchesUser(String candidate) {
+        if (candidate == targetId) return true;
+        return candidate.replaceFirst('usr_', '') == targetId.replaceFirst('usr_', '');
+      }
+
+      return list.where((app) => matchesUser(app.castMemberId)).toList();
     });
   }
 

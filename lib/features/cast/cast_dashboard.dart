@@ -6,7 +6,6 @@ import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_notification_service.dart';
 import '../../services/firebase_schedule_service.dart';
 import '../../services/schedule_service.dart';
-import '../common/conflict_resolution_screen.dart';
 import '../common/notifications_screen.dart';
 import '../common/offline_sync_banner.dart';
 import '../profile/screens/profile_screen.dart';
@@ -404,36 +403,12 @@ class _CastDashboardState extends State<CastDashboard> {
             ...pendingRehearsals.map(
               (rehearsal) => _ConflictDetectedCard(
                 rehearsal: rehearsal,
-                onResolve: () => _openConflictResolution(context, rehearsal),
               ),
             ),
             const SizedBox(height: 20),
           ],
         );
       },
-    );
-  }
-
-  void _openConflictResolution(BuildContext context, Rehearsal rehearsal) {
-    final conflict = RehearsalConflict(
-      type: ConflictType.venue,
-      conflictingRehearsalId: 'reh_existing_${rehearsal.rehearsalId}',
-      description:
-          '${rehearsal.venueId} is already booked during this time window. '
-          'Resolve before confirming.',
-      conflictStart: rehearsal.startAt,
-      conflictEnd: rehearsal.endAt,
-      location: rehearsal.venueId,
-    );
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ConflictResolutionScreen(
-          conflictingRehearsal: rehearsal,
-          conflict: conflict,
-        ),
-      ),
     );
   }
 
@@ -872,14 +847,12 @@ class _NavCard extends StatelessWidget {
   }
 }
 
-/// FR-07: Conflict detected card for a proposed rehearsal.
+/// FR-07: Read-only conflict notification card for Cast Members (BR-09, BR-10).
 class _ConflictDetectedCard extends StatelessWidget {
   final Rehearsal rehearsal;
-  final VoidCallback onResolve;
 
   const _ConflictDetectedCard({
     required this.rehearsal,
-    required this.onResolve,
   });
 
   String _fmt(DateTime dt) =>
@@ -939,18 +912,20 @@ class _ConflictDetectedCard extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(
-            onPressed: onResolve,
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFD9383A),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD9383A).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: const Text(
-              'Resolve\n(FR-08)',
+              'Awaiting Director\nValidation',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFD9383A),
+                height: 1.2,
               ),
             ),
           ),

@@ -44,53 +44,53 @@ class FirebaseScheduleService implements ScheduleService {
     _rehearsals.addAll([
       Rehearsal(
         rehearsalId: 'reh_101',
-        productionId: 'prod_1',
+        productionId: 'prod_101',
         venueId: 'Studio A - Main Stage',
         startAt: now.add(const Duration(days: 1, hours: 2)),
         endAt: now.add(const Duration(days: 1, hours: 5)),
-        participantIds: ['cast_201', 'dir_101'],
+        participantIds: ['usr_cast_201', 'usr_dir_101', 'cast_201', 'dir_101'],
         status: RehearsalStatus.confirmed,
         clientPending: false,
-        createdBy: 'dir_101',
+        createdBy: 'usr_dir_101',
         createdAt: now.subtract(const Duration(days: 2)),
         updatedAt: now.subtract(const Duration(days: 2)),
       ),
       Rehearsal(
         rehearsalId: 'reh_102',
-        productionId: 'prod_1',
+        productionId: 'prod_101',
         venueId: 'Studio B - Rehearsal Room',
         startAt: now.add(const Duration(days: 3, hours: 4)),
         endAt: now.add(const Duration(days: 3, hours: 7)),
-        participantIds: ['cast_201', 'cast_202', 'dir_101'],
+        participantIds: ['usr_cast_201', 'usr_cast_202', 'usr_dir_101', 'cast_201', 'cast_202', 'dir_101'],
         status: RehearsalStatus.proposed,
         clientPending: false,
-        createdBy: 'dir_101',
+        createdBy: 'usr_dir_101',
         createdAt: now.subtract(const Duration(days: 1)),
         updatedAt: now.subtract(const Duration(days: 1)),
       ),
       Rehearsal(
         rehearsalId: 'reh_103',
-        productionId: 'prod_1',
+        productionId: 'prod_101',
         venueId: 'Black Box Theatre',
         startAt: now.add(const Duration(days: 5, hours: 1)),
         endAt: now.add(const Duration(days: 5, hours: 4)),
-        participantIds: ['cast_201', 'dir_101'],
+        participantIds: ['usr_cast_201', 'usr_dir_101', 'cast_201', 'dir_101'],
         status: RehearsalStatus.confirmed,
         clientPending: true,
-        createdBy: 'dir_101',
+        createdBy: 'usr_dir_101',
         createdAt: now,
         updatedAt: now,
       ),
       Rehearsal(
         rehearsalId: 'reh_104_cancelled',
-        productionId: 'prod_1',
+        productionId: 'prod_101',
         venueId: 'Studio C',
         startAt: now.subtract(const Duration(days: 1)),
         endAt: now.subtract(const Duration(days: 1, hours: -3)),
-        participantIds: ['cast_201'],
+        participantIds: ['usr_cast_201', 'cast_201'],
         status: RehearsalStatus.cancelled,
         clientPending: false,
-        createdBy: 'dir_101',
+        createdBy: 'usr_dir_101',
         createdAt: now.subtract(const Duration(days: 4)),
         updatedAt: now.subtract(const Duration(days: 1)),
       ),
@@ -248,12 +248,19 @@ class FirebaseScheduleService implements ScheduleService {
 
     return _rehearsalsController.stream.asyncMap((list) async {
       final currentUser = await _authService.currentUser();
-      final userId = currentUser?.userId ?? 'cast_201';
+      final userId = currentUser?.userId ?? 'usr_cast_201';
+
+      bool matchesUser(String candidate) {
+        if (candidate == userId) return true;
+        final cleanCandidate = candidate.replaceFirst('usr_', '');
+        final cleanUser = userId.replaceFirst('usr_', '');
+        return cleanCandidate == cleanUser;
+      }
 
       // Chronological, cancelled excluded (FR-09 requirement)
       final filtered = list.where((r) {
         if (r.status == RehearsalStatus.cancelled) return false;
-        return r.participantIds.contains(userId) || r.createdBy == userId;
+        return r.participantIds.any(matchesUser) || matchesUser(r.createdBy);
       }).toList();
 
       filtered.sort((a, b) => a.startAt.compareTo(b.startAt));
@@ -280,10 +287,19 @@ class FirebaseScheduleService implements ScheduleService {
     Future.microtask(() => _notifyListeners());
 
     return _rehearsalsController.stream.map((list) {
+      bool matchesProd(String candidate) {
+        if (candidate == productionId) return true;
+        if ((candidate == 'prod_1' && productionId == 'prod_101') ||
+            (candidate == 'prod_101' && productionId == 'prod_1')) {
+          return true;
+        }
+        return false;
+      }
+
       // Chronological, cancelled excluded (FR-09 requirement)
       final filtered = list.where((r) {
         if (r.status == RehearsalStatus.cancelled) return false;
-        return r.productionId == productionId;
+        return matchesProd(r.productionId);
       }).toList();
 
       filtered.sort((a, b) => a.startAt.compareTo(b.startAt));
@@ -305,6 +321,7 @@ class FirebaseScheduleService implements ScheduleService {
   }
 
   void reset() {
+    _cacheStore.reset();
     _rehearsals.clear();
     _seedInitialData();
   }
