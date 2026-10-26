@@ -10,7 +10,7 @@ class MockConflictService implements ConflictService {
   final MockDataService _dataService;
 
   MockConflictService({MockDataService? dataService})
-      : _dataService = dataService ?? MockDataService();
+    : _dataService = dataService ?? MockDataService();
 
   String _formatTime(DateTime dt) {
     final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
@@ -19,7 +19,7 @@ class MockConflictService implements ConflictService {
     return '$hour:$minute $period';
   }
 
-  /// Checks whether two time intervals overlap on the same calendar day.
+  /// Checks whether two time intervals overlap.
   /// Standard interval formula: proposedStart < existingEnd && existingStart < proposedEnd.
   /// Adjacent intervals (e.g. 10:00-11:00 and 11:00-12:00) do NOT overlap.
   bool _isOverlapping({
@@ -28,15 +28,12 @@ class MockConflictService implements ConflictService {
     required DateTime existingStart,
     required DateTime existingEnd,
   }) {
-    // Must be on the exact same calendar day
-    final isSameDay = proposedStart.year == existingStart.year &&
-        proposedStart.month == existingStart.month &&
-        proposedStart.day == existingStart.day;
-
-    if (!isSameDay) return false;
-
-    return proposedStart.isBefore(existingEnd) &&
-        existingStart.isBefore(proposedEnd);
+    return ConflictDetectionRules.intervalsOverlap(
+      startA: proposedStart,
+      endA: proposedEnd,
+      startB: existingStart,
+      endB: existingEnd,
+    );
   }
 
   /// Friendly convenience alias for check(...) supporting date and time arguments.
@@ -66,10 +63,7 @@ class MockConflictService implements ConflictService {
     required List<String> participantIds,
     String? excludeRehearsalId,
   }) async {
-    // Input sanity: startAt must precede endAt
-    if (!startAt.isBefore(endAt)) {
-      return [];
-    }
+    ConflictDetectionRules.validateInterval(startAt: startAt, endAt: endAt);
 
     final conflicts = <Conflict>[];
     final allRehearsals = _dataService.getAllRehearsals();
@@ -124,7 +118,7 @@ class MockConflictService implements ConflictService {
     }
 
     // ── 2. Check Cast Member Conflicts ───────────────────────────────────────
-    for (final participantId in participantIds) {
+    for (final participantId in participantIds.toSet()) {
       for (final rehearsal in eligibleRehearsals) {
         if (rehearsal.participantIds.contains(participantId)) {
           if (_isOverlapping(
@@ -139,7 +133,8 @@ class MockConflictService implements ConflictService {
 
             conflicts.add(
               Conflict(
-                conflictId: 'cnf_cast_${participantId}_${rehearsal.rehearsalId}',
+                conflictId:
+                    'cnf_cast_${participantId}_${rehearsal.rehearsalId}',
                 type: ConflictType.cast,
                 resourceId: participantId,
                 resourceName: actorName,

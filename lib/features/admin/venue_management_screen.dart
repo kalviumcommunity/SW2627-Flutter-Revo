@@ -165,6 +165,122 @@ class _VenueManagementScreenState extends State<VenueManagementScreen> {
     );
   }
 
+  Future<void> _editVenue(Venue venue) async {
+    final nameController = TextEditingController(text: venue.name);
+    final locationController = TextEditingController(text: venue.location);
+    final capacityController =
+        TextEditingController(text: venue.capacity.toString());
+    final formKey = GlobalKey<FormState>();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Venue'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Name'),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty
+                        ? 'Name is required.'
+                        : null,
+              ),
+              TextFormField(
+                controller: locationController,
+                decoration: const InputDecoration(labelText: 'Location'),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty
+                        ? 'Location is required.'
+                        : null,
+              ),
+              TextFormField(
+                controller: capacityController,
+                decoration: const InputDecoration(labelText: 'Capacity'),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  final capacity = int.tryParse(value ?? '');
+                  return capacity == null || capacity < 0
+                      ? 'Enter a valid capacity.'
+                      : null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (!(formKey.currentState?.validate() ?? false)) return;
+              try {
+                await widget.venueRepository.updateVenue(
+                  venue.venueId,
+                  VenueInput(
+                    name: nameController.text,
+                    location: locationController.text,
+                    capacity: int.parse(capacityController.text),
+                    availability: venue.availability,
+                  ),
+                );
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext, true);
+                }
+              } catch (error) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text(error.toString())),
+                  );
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    nameController.dispose();
+    locationController.dispose();
+    capacityController.dispose();
+    if (saved == true && mounted) setState(() {});
+  }
+
+  Future<void> _deleteVenue(Venue venue) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete venue?'),
+        content: Text('Delete "${venue.name}" permanently?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await widget.venueRepository.deleteVenue(venue.venueId);
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    }
+  }
+
   void _showVenueBookingsModal(Venue venue) {
     showModalBottomSheet(
       context: context,
@@ -350,6 +466,32 @@ class _VenueManagementScreenState extends State<VenueManagementScreen> {
                             ),
                           if (_isAdmin) ...[
                             const SizedBox(height: RevoSpacing.lg),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    icon: const Icon(Icons.edit_outlined),
+                                    label: const Text('Edit Venue'),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      _editVenue(currentVenue);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: RevoSpacing.sm),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    icon: const Icon(Icons.delete_outline),
+                                    label: const Text('Delete'),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      _deleteVenue(currentVenue);
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: RevoSpacing.sm),
                             OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: currentIsActive

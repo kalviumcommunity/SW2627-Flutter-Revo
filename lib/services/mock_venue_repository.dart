@@ -70,10 +70,20 @@ class MockVenueRepository implements VenueRepository {
         'Venue $venueId not found.',
       );
     }
+
     await _dataService.updateVenue(
       venueId: venueId,
       input: input,
     );
+  }
+
+  @override
+  Future<void> deleteVenue(String venueId) async {
+    final existing = _dataService.getVenueById(venueId);
+    if (existing == null) {
+      throw RevoException(RevoErrorCode.notFound, 'Venue $venueId not found.');
+    }
+    await _dataService.deleteVenue(venueId);
   }
 
   @override

@@ -116,6 +116,7 @@ class MockProductionRepository implements ProductionRepository {
         'Production $productionId not found.',
       );
     }
+
     await _dataService.updateProduction(
       productionId: productionId,
       input: ProductionInput(
@@ -126,6 +127,18 @@ class MockProductionRepository implements ProductionRepository {
         status: status,
       ),
     );
+  }
+
+  @override
+  Future<void> deleteProduction(String productionId) async {
+    final existing = _dataService.getProductionById(productionId);
+    if (existing == null) {
+      throw RevoException(
+        RevoErrorCode.notFound,
+        'Production $productionId not found.',
+      );
+    }
+    await _dataService.deleteProduction(productionId);
   }
 
   @override
