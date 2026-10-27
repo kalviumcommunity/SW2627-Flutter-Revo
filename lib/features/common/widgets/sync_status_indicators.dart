@@ -36,8 +36,9 @@ class ComprehensiveSyncBanner extends StatelessWidget {
           );
         }
 
-        // Priority 2: Failed writes / sync error
-        if (snap.hasError || snap.pendingCount > 0 && snap.legacySyncState == SyncState.stale) {
+        // Priority 2: Failed writes / sync error on pending operations
+        if (snap.pendingCount > 0 &&
+            (snap.hasError || snap.legacySyncState == SyncState.stale)) {
           return FailedSyncBanner(
             onRetry: () => syncService.reconcilePending(),
           );

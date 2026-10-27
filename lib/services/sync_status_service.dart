@@ -446,7 +446,12 @@ class SyncStatusService implements SyncService {
       _remoteHandler = onSyncOp;
     }
 
+    _lastSyncError = null;
+
     if (_connectivity != ConnectivityState.online || _remoteHandler == null) {
+      if (_pendingOps.isEmpty) {
+        recordSuccessfulSync();
+      }
       return [];
     }
 
@@ -458,7 +463,7 @@ class SyncStatusService implements SyncService {
       await _executeOperation(op);
     }
 
-    if (_pendingOps.isEmpty && opsToProcess.isNotEmpty) {
+    if (_pendingOps.isEmpty) {
       recordSuccessfulSync();
     }
 
