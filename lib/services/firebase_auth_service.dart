@@ -59,22 +59,22 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
     _demoUsers.addAll({
       'usr_dir_101': AppUser(
         userId: 'usr_dir_101',
-        name: 'Sarah Jenkins (Director)',
-        email: 'director@revo.com',
+        name: 'Sarah Jenkins',
+        email: 'director@revo.in',
         role: UserRole.director,
         createdAt: DateTime.utc(2026, 1, 1),
       ),
       'usr_cast_201': AppUser(
         userId: 'usr_cast_201',
-        name: 'Alex Rivera (Cast)',
-        email: 'cast@revo.com',
+        name: 'Alex Rivera',
+        email: 'cast@revo.in',
         role: UserRole.cast,
         createdAt: DateTime.utc(2026, 1, 1),
       ),
       'usr_admin_301': AppUser(
         userId: 'usr_admin_301',
-        name: 'Elena Rostova (Admin)',
-        email: 'admin@revo.com',
+        name: 'Elena Rostova',
+        email: 'admin@revo.in',
         role: UserRole.admin,
         createdAt: DateTime.utc(2026, 1, 1),
       ),
@@ -206,6 +206,12 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
       orElse: () => null,
     );
     if (demoUser != null) {
+      if (password.trim() != '1234567890') {
+        throw RevoException(
+          RevoErrorCode.unauthenticated,
+          'Invalid credentials. Please enter password: 1234567890',
+        );
+      }
       _demoCurrentUser = demoUser;
       _demoAuthController.add(demoUser);
       return demoUser;

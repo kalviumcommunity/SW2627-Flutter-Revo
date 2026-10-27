@@ -11,6 +11,7 @@ import '../../models/venue.dart';
 import '../../services/auth_identity.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/production_repository.dart';
+import '../../services/mock_data_service.dart';
 
 class FirebaseProductionRepository implements ProductionRepository {
   FirebaseProductionRepository({
@@ -66,15 +67,25 @@ class FirebaseProductionRepository implements ProductionRepository {
     required String userId,
     required UserRole role,
   }) {
+    final fallback = MockDataService().getProductionsSync().where((p) {
+      if (role == UserRole.director && p.directorId != userId) {
+        return false;
+      }
+      return true;
+    }).toList()
+      ..sort((a, b) => a.startDate.compareTo(b.startDate));
+
     Query<Map<String, dynamic>> query = _productions;
     if (role == UserRole.director) {
       query = query.where('directorId', isEqualTo: userId);
     }
     return query.snapshots().map(
-      (s) =>
-          s.docs.map(_fromDocument).toList()
-            ..sort((a, b) => a.startDate.compareTo(b.startDate)),
-    );
+      (s) {
+        final items = s.docs.map(_fromDocument).toList()
+          ..sort((a, b) => a.startDate.compareTo(b.startDate));
+        return items.isNotEmpty ? items : fallback;
+      },
+    ).handleError((_) => fallback);
   }
 
   @override

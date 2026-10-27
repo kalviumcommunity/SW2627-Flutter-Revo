@@ -365,8 +365,10 @@ class MockDataService {
     return _venuesStreamController.stream;
   }
 
-  List<Venue> getVenuesSync() {
-    return List.unmodifiable(_venues);
+  List<Venue> getVenuesSync({bool activeOnly = false}) {
+    return activeOnly
+        ? _venues.where((v) => v.status == VenueStatus.active).toList()
+        : List.unmodifiable(_venues);
   }
 
   Venue? getVenueById(String id) {
@@ -531,6 +533,72 @@ class MockDataService {
             a.productionId == productionId &&
             a.status == AssignmentStatus.active)
         .toList();
+  }
+
+  List<CastAssignment> getCastAssignmentsForUser(String userId) {
+    final cleanId = userId.trim();
+    return _castAssignments
+        .where((a) =>
+            (a.castMemberId == cleanId ||
+             a.castMemberId == cleanId.replaceFirst('usr_', '') ||
+             cleanId == 'usr_${a.castMemberId}') &&
+            a.status == AssignmentStatus.active)
+        .toList();
+  }
+
+  void addRole(ProductionRole role) {
+    _roles.add(role);
+    _notifyAll();
+  }
+
+  void assignCastToRole(String roleId, String castMemberId, {String? productionId}) {
+    final roleIdx = _roles.indexWhere((r) => r.roleId == roleId);
+    if (roleIdx != -1) {
+      final role = _roles[roleIdx];
+      _roles[roleIdx] = ProductionRole(
+        roleId: role.roleId,
+        productionId: role.productionId,
+        name: role.name,
+        description: role.description,
+        status: RoleStatus.assigned,
+      );
+    }
+    _castAssignments.add(
+      CastAssignment(
+        assignmentId: 'asgn_${DateTime.now().millisecondsSinceEpoch}',
+        productionId: productionId ?? 'prod_101',
+        roleId: roleId,
+        castMemberId: castMemberId,
+        assignedAt: DateTime.now(),
+        status: AssignmentStatus.active,
+      ),
+    );
+    _notifyAll();
+  }
+
+  void removeCastAssignment(String assignmentId) {
+    final idx =
+        _castAssignments.indexWhere((a) => a.assignmentId == assignmentId);
+    if (idx != -1) {
+      final asgn = _castAssignments[idx];
+      _castAssignments.removeAt(idx);
+      final roleIdx = _roles.indexWhere((r) => r.roleId == asgn.roleId);
+      if (roleIdx != -1) {
+        final role = _roles[roleIdx];
+        _roles[roleIdx] = ProductionRole(
+          roleId: role.roleId,
+          productionId: role.productionId,
+          name: role.name,
+          description: role.description,
+          status: RoleStatus.open,
+        );
+      }
+      _notifyAll();
+    }
+  }
+
+  List<Production> getProductionsSync() {
+    return List.unmodifiable(_productions);
   }
 
   List<Venue> getVenuesForProduction(String productionId) {

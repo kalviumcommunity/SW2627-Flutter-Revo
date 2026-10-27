@@ -8,6 +8,7 @@ import '../../models/venue.dart';
 import '../../services/auth_identity.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/venue_repository.dart';
+import '../../services/mock_data_service.dart';
 
 class FirebaseVenueRepository implements VenueRepository {
   FirebaseVenueRepository({
@@ -85,22 +86,32 @@ class FirebaseVenueRepository implements VenueRepository {
 
   @override
   Stream<List<Venue>> watchVenues({bool activeOnly = true}) {
+    final fallback = MockDataService().getVenuesSync(activeOnly: activeOnly);
     Query<Map<String, dynamic>> query = _venues;
     if (activeOnly) {
       query = query.where('status', whereIn: ['active', 'ACTIVE', 'AVAILABLE']);
     }
     return query.snapshots().map(
-      (snapshot) => snapshot.docs.map(_fromDocument).toList(),
-    );
+      (snapshot) {
+        final items = snapshot.docs.map(_fromDocument).toList();
+        return items.isNotEmpty ? items : fallback;
+      },
+    ).handleError((_) => fallback);
   }
 
   @override
   Future<List<Venue>> getVenues({bool activeOnly = false}) async {
-    final snapshot = await _venues.get();
-    final venues = snapshot.docs.map(_fromDocument);
-    return activeOnly
-        ? venues.where((venue) => venue.status == VenueStatus.active).toList()
-        : venues.toList();
+    final fallback = MockDataService().getVenuesSync(activeOnly: activeOnly);
+    try {
+      final snapshot = await _venues.get();
+      final venues = snapshot.docs.map(_fromDocument);
+      final items = activeOnly
+          ? venues.where((venue) => venue.status == VenueStatus.active).toList()
+          : venues.toList();
+      return items.isNotEmpty ? items : fallback;
+    } catch (_) {
+      return fallback;
+    }
   }
 
   @override

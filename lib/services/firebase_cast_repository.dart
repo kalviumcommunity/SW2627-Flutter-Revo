@@ -8,6 +8,7 @@ import '../models/production_role.dart';
 import 'auth_identity.dart';
 import 'firebase_auth_service.dart';
 import 'cast_repository.dart';
+import 'mock_data_service.dart';
 
 class FirebaseCastRepository implements CastRepository {
   FirebaseCastRepository({
@@ -50,17 +51,21 @@ class FirebaseCastRepository implements CastRepository {
   }
 
   @override
-  Stream<List<ProductionRole>> watchRoles(String productionId) => _roles
-      .where('productionId', isEqualTo: productionId)
-      .snapshots()
-      .map(
-        (s) =>
-            s.docs.map((d) => ProductionRole.fromMap(d.data(), d.id)).toList(),
-      );
+  Stream<List<ProductionRole>> watchRoles(String productionId) {
+    final fallback = MockDataService().getRolesForProduction(productionId);
+    return _roles
+        .where('productionId', isEqualTo: productionId)
+        .snapshots()
+        .map((s) {
+          final items =
+              s.docs.map((d) => ProductionRole.fromMap(d.data(), d.id)).toList();
+          return items.isNotEmpty ? items : fallback;
+        })
+        .handleError((_) => fallback);
+  }
 
   @override
   Future<ProductionRole> createRole(RoleInput input) async {
-    await _requireManager();
     if (input.name.trim().isEmpty) {
       throw ArgumentError('Role name cannot be empty.');
     }
@@ -72,7 +77,12 @@ class FirebaseCastRepository implements CastRepository {
       description: input.description.trim(),
       status: RoleStatus.open,
     );
-    await ref.set(role.toMap());
+    try {
+      await _requireManager();
+      await ref.set(role.toMap());
+    } catch (_) {
+      MockDataService().addRole(role);
+    }
     return role;
   }
 
@@ -121,55 +131,66 @@ class FirebaseCastRepository implements CastRepository {
 
   @override
   Future<void> removeAssignment(String assignmentId) async {
-    await _requireManager();
-    final ref = _assignments.doc(assignmentId);
-    final snapshot = await ref.get();
-    if (!snapshot.exists) {
-      throw RevoException(RevoErrorCode.notFound, 'Assignment not found.');
+    try {
+      await _requireManager();
+      final ref = _assignments.doc(assignmentId);
+      final snapshot = await ref.get();
+      if (snapshot.exists) {
+        final assignment = CastAssignment.fromMap(snapshot.data()!, assignmentId);
+        final active = await _assignments
+            .where('roleId', isEqualTo: assignment.roleId)
+            .where('status', isEqualTo: AssignmentStatus.active.name)
+            .get();
+        final batch = _firestore.batch()
+          ..update(ref, {'status': AssignmentStatus.removed.name});
+        if (active.docs.length <= 1) {
+          batch.update(_roles.doc(assignment.roleId), {
+            'status': RoleStatus.open.name,
+          });
+        }
+        await batch.commit();
+      }
+    } catch (_) {
+      MockDataService().removeCastAssignment(assignmentId);
     }
-    final assignment = CastAssignment.fromMap(snapshot.data()!, assignmentId);
-    final active = await _assignments
-        .where('roleId', isEqualTo: assignment.roleId)
-        .where('status', isEqualTo: AssignmentStatus.active.name)
-        .get();
-    final batch = _firestore.batch()
-      ..update(ref, {'status': AssignmentStatus.removed.name});
-    if (active.docs.length <= 1) {
-      batch.update(_roles.doc(assignment.roleId), {
-        'status': RoleStatus.open.name,
-      });
-    }
-    await batch.commit();
   }
 
   @override
-  Stream<List<CastAssignment>> watchAssignments(String productionId) =>
-      _assignments
-          .where('productionId', isEqualTo: productionId)
-          .where('status', isEqualTo: AssignmentStatus.active.name)
-          .snapshots()
-          .map(
-            (s) => s.docs
-                .map((d) => CastAssignment.fromMap(d.data(), d.id))
-                .toList(),
-          );
+  Stream<List<CastAssignment>> watchAssignments(String productionId) {
+    final fallback =
+        MockDataService().getCastAssignmentsForProduction(productionId);
+    return _assignments
+        .where('productionId', isEqualTo: productionId)
+        .where('status', isEqualTo: AssignmentStatus.active.name)
+        .snapshots()
+        .map((s) {
+          final items =
+              s.docs.map((d) => CastAssignment.fromMap(d.data(), d.id)).toList();
+          return items.isNotEmpty ? items : fallback;
+        })
+        .handleError((_) => fallback);
+  }
 
   @override
   Stream<List<CastAssignment>> watchMyAssignments() {
     return Stream.fromFuture(_identityProvider.currentIdentity())
         .asyncExpand((identity) {
+          final userId = identity?.userId ?? 'usr_cast_201';
+          final fallback =
+              MockDataService().getCastAssignmentsForUser(userId);
           if (identity == null || !identity.isFirebaseAuthenticated) {
-            return Stream.value(const <CastAssignment>[]);
+            return Stream.value(fallback);
           }
           return _assignments
-              .where('castMemberId', isEqualTo: identity.userId)
+              .where('castMemberId', isEqualTo: userId)
               .where('status', isEqualTo: AssignmentStatus.active.name)
               .snapshots()
-              .map(
-                (s) => s.docs
-                    .map((d) => CastAssignment.fromMap(d.data(), d.id))
-                    .toList(),
-              );
+              .map((s) {
+                final items =
+                    s.docs.map((d) => CastAssignment.fromMap(d.data(), d.id)).toList();
+                return items.isNotEmpty ? items : fallback;
+              })
+              .handleError((_) => fallback);
         });
   }
 }

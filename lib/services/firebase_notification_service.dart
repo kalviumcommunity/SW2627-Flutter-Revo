@@ -69,13 +69,33 @@ class FirebaseNotificationService implements NotificationService {
       ),
       AppNotification(
         notificationId: 'notif_005',
-        userId: 'dir_101',
+        userId: 'usr_dir_101',
         type: 'ConflictAlert',
         message:
             'Venue conflict: Studio A is double-booked on Day 5 between 10:00–13:00. Action required.',
         relatedId: 'reh_103',
         createdAt: now.subtract(const Duration(minutes: 30)),
         read: false,
+      ),
+      AppNotification(
+        notificationId: 'notif_006',
+        userId: 'usr_admin_301',
+        type: 'VenueMaintenance',
+        message:
+            'Green Room Lab scheduled for A/C HVAC maintenance this Friday.',
+        relatedId: 'ven_104',
+        createdAt: now.subtract(const Duration(hours: 1)),
+        read: false,
+      ),
+      AppNotification(
+        notificationId: 'notif_007',
+        userId: 'usr_admin_301',
+        type: 'ProductionNotice',
+        message:
+            'New audition posting published for "The Crucible". 3 applicants submitted.',
+        relatedId: 'prod_101',
+        createdAt: now.subtract(const Duration(hours: 4)),
+        read: true,
       ),
     ]);
 
@@ -86,7 +106,6 @@ class FirebaseNotificationService implements NotificationService {
     _notificationsController.add(List.unmodifiable(_notifications));
   }
 
-  /// FR-11: Watch real-time stream of notifications for current authenticated user.
   @override
   Stream<List<AppNotification>> watchMyNotifications() {
     Future.microtask(() => _emitForCurrentUser());
@@ -94,12 +113,13 @@ class FirebaseNotificationService implements NotificationService {
     return _notificationsController.stream.asyncMap((allNotifs) async {
       final currentUser = await _authService.currentUser();
       final userId = currentUser?.userId;
-      // Bug 4 fix: return empty list when no user is authenticated instead of
-      // falling back to the hardcoded 'cast_201' ID (data leakage between users).
       if (userId == null) return const <AppNotification>[];
-      final userNotifs =
-          allNotifs.where((n) => n.userId == userId).toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final userNotifs = allNotifs.where((n) {
+        return n.userId == userId ||
+            n.userId == userId.replaceFirst('usr_', '') ||
+            userId == 'usr_${n.userId}';
+      }).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return userNotifs;
     });
   }

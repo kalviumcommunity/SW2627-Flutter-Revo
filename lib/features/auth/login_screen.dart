@@ -51,14 +51,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _fillDemoCredentials(String email, String password) {
-    setState(() {
-      _emailController.text = email;
-      _passwordController.text = password;
-      _errorMessage = null;
-    });
-  }
-
   Future<void> _handleLogin() async {
     // Dismiss keyboard
     FocusScope.of(context).unfocus();
@@ -223,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           // Email Input
                           AppTextField(
                             label: 'Email Address',
-                            hint: 'director@revo.com',
+                            hint: 'you@revo.in',
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.next,
@@ -358,63 +350,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Demo Accounts Helper Card
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: RevoColors.surfaceContainerLow,
-                        borderRadius: RevoSpacing.borderRadiusCard,
-                        border: Border.all(color: RevoColors.surfaceDim),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.key_outlined,
-                                size: 16,
-                                color: RevoColors.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Mock Demo Accounts (Quick Fill):',
-                                  style: RevoTypography.captionBadge.copyWith(
-                                    color: RevoColors.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _demoChip(
-                                label: 'Director',
-                                email: 'director@revo.com',
-                                color: RevoColors.primary,
-                              ),
-                              _demoChip(
-                                label: 'Cast Member',
-                                email: 'cast@revo.com',
-                                color: RevoColors.successGreen,
-                              ),
-                              _demoChip(
-                                label: 'Theatre Admin',
-                                email: 'admin@revo.com',
-                                color: RevoColors.warningText,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
                     // Register Link
                     Wrap(
                       alignment: WrapAlignment.center,
@@ -441,25 +376,5 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  Widget _demoChip({
-    required String label,
-    required String email,
-    required Color color,
-  }) {
-    return ActionChip(
-      avatar: CircleAvatar(
-        radius: 6,
-        backgroundColor: color,
-      ),
-      label: Text(
-        label,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-      ),
-      backgroundColor: RevoColors.surfaceContainerLowest,
-      side: const BorderSide(color: RevoColors.surfaceDim),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      onPressed: () => _fillDemoCredentials(email, 'password123'),
-    );
-  }
 }
+

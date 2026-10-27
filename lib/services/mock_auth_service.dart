@@ -31,7 +31,7 @@ class MockAuthService implements AuthService {
 
   void _seedDefaultAccounts() {
     // 1. Director Account
-    const dirEmail = 'director@revo.com';
+    const dirEmail = 'director@revo.in';
     final dirUser = AppUser(
       userId: 'usr_dir_101',
       name: 'Sarah Jenkins',
@@ -40,10 +40,10 @@ class MockAuthService implements AuthService {
       createdAt: DateTime.now().subtract(const Duration(days: 45)),
     );
     _usersByEmail[dirEmail] = dirUser;
-    _passwordsByEmail[dirEmail] = 'password123';
+    _passwordsByEmail[dirEmail] = '1234567890';
 
     // 2. Cast Member Account
-    const castEmail = 'cast@revo.com';
+    const castEmail = 'cast@revo.in';
     final castUser = AppUser(
       userId: 'usr_cast_201',
       name: 'Alex Rivera',
@@ -52,10 +52,10 @@ class MockAuthService implements AuthService {
       createdAt: DateTime.now().subtract(const Duration(days: 20)),
     );
     _usersByEmail[castEmail] = castUser;
-    _passwordsByEmail[castEmail] = 'password123';
+    _passwordsByEmail[castEmail] = '1234567890';
 
     // 3. Theatre Admin Account
-    const adminEmail = 'admin@revo.com';
+    const adminEmail = 'admin@revo.in';
     final adminUser = AppUser(
       userId: 'usr_admin_301',
       name: 'Elena Rostova',
@@ -64,7 +64,7 @@ class MockAuthService implements AuthService {
       createdAt: DateTime.now().subtract(const Duration(days: 90)),
     );
     _usersByEmail[adminEmail] = adminUser;
-    _passwordsByEmail[adminEmail] = 'password123';
+    _passwordsByEmail[adminEmail] = '1234567890';
   }
 
   @override

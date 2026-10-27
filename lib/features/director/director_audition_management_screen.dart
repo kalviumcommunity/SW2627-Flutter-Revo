@@ -9,7 +9,7 @@ class DirectorAuditionManagementScreen extends StatefulWidget {
 
   const DirectorAuditionManagementScreen({
     super.key,
-    this.productionId = 'prod_1',
+    this.productionId = 'prod_101',
   });
 
   @override
