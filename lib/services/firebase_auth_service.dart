@@ -221,7 +221,7 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
           role: defaultRole,
           createdAt: DateTime.now().toUtc(),
         );
-        await _firestore!.collection('users').doc(firebaseUser.uid).set(newProfile.toMap());
+        await _firestore.collection('users').doc(firebaseUser.uid).set(newProfile.toMap());
         return newProfile;
       }
 
@@ -301,7 +301,7 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
           .doc(firebaseUser.uid)
           .set(profile.toMap());
     } catch (_) {
-      await _auth!.signOut(); // Bug 1 fix: _auth is nullable, must use ! operator
+      await _auth.signOut();
       rethrow;
     }
     return profile;
