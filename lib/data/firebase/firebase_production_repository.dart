@@ -79,13 +79,29 @@ class FirebaseProductionRepository implements ProductionRepository {
     if (role == UserRole.director) {
       query = query.where('directorId', isEqualTo: userId);
     }
-    return query.snapshots().map(
-      (s) {
-        final items = s.docs.map(_fromDocument).toList()
-          ..sort((a, b) => a.startDate.compareTo(b.startDate));
-        return items.isNotEmpty ? items : fallback;
-      },
-    ).handleError((_) => fallback);
+    // Show the local role-scoped catalog immediately while Firestore connects.
+    // A snapshot may be delayed indefinitely when Firebase is offline or the
+    // user has not been granted access, which would otherwise leave the UI in
+    // its loading state forever.
+    return Stream<List<Production>>.multi((controller) {
+      controller.add(fallback);
+      final subscription = query.snapshots().listen(
+        (snapshot) {
+          try {
+            final items = snapshot.docs.map(_fromDocument).toList()
+              ..sort((a, b) => a.startDate.compareTo(b.startDate));
+            controller.add(items.isNotEmpty ? items : fallback);
+          } catch (error) {
+            controller.addError(error);
+          }
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          controller.add(fallback);
+        },
+        onDone: controller.close,
+      );
+      controller.onCancel = subscription.cancel;
+    });
   }
 
   @override

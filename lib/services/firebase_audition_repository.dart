@@ -15,7 +15,8 @@ class FirebaseAuditionRepository implements AuditionRepository {
     FirebaseAuth? auth,
     AuthIdentityProvider? identityProvider,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _identityProvider = identityProvider ??
+       _identityProvider =
+           identityProvider ??
            (auth != null
                ? FirebaseAuthIdentityProvider(
                    auth: auth,
@@ -38,8 +39,7 @@ class FirebaseAuditionRepository implements AuditionRepository {
         'Authentication is required.',
       );
     }
-    if (identity.role != UserRole.director &&
-        identity.role != UserRole.admin) {
+    if (identity.role != UserRole.director && identity.role != UserRole.admin) {
       throw RevoException(
         RevoErrorCode.permissionDenied,
         'Only directors or admins can manage auditions.',
@@ -120,13 +120,22 @@ class FirebaseAuditionRepository implements AuditionRepository {
     if (openOnly) {
       query = query.where('status', isEqualTo: AuditionStatus.open.name);
     }
-    return query.snapshots().map(
-      (s) {
-        final items =
-            s.docs.map((d) => Audition.fromMap(d.data(), d.id)).toList();
-        return items.isNotEmpty ? items : fallback;
-      },
-    ).handleError((_) => fallback);
+    return Stream<List<Audition>>.multi((controller) {
+      controller.add(fallback);
+      final subscription = query.snapshots().listen(
+        (snapshot) {
+          final items = snapshot.docs
+              .map((document) => Audition.fromMap(document.data(), document.id))
+              .toList();
+          controller.add(items.isNotEmpty ? items : fallback);
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          controller.add(fallback);
+        },
+        onDone: controller.close,
+      );
+      controller.onCancel = subscription.cancel;
+    });
   }
 
   @override
@@ -201,9 +210,11 @@ class FirebaseAuditionRepository implements AuditionRepository {
   Future<void> withdraw(String applicationId) async {
     final identity = await _identityProvider.currentIdentity();
     final userId = identity?.userId ?? 'usr_cast_201';
-    _mockApplications.removeWhere((a) =>
-        a.applicationId == applicationId &&
-        (a.castMemberId == userId || userId == 'usr_${a.castMemberId}'));
+    _mockApplications.removeWhere(
+      (a) =>
+          a.applicationId == applicationId &&
+          (a.castMemberId == userId || userId == 'usr_${a.castMemberId}'),
+    );
     try {
       final ref = _applications.doc(applicationId);
       await ref.update({'status': ApplicationStatus.withdrawn.name});
@@ -212,45 +223,52 @@ class FirebaseAuditionRepository implements AuditionRepository {
 
   @override
   Stream<List<Application>> watchApplicants(String auditionId) {
-    final fallback =
-        _mockApplications.where((a) => a.auditionId == auditionId).toList();
-    return _applications
-        .where('auditionId', isEqualTo: auditionId)
-        .snapshots()
-        .map(
-          (s) {
-            final items =
-                s.docs.map((d) => Application.fromMap(d.data(), d.id)).toList();
-            return items.isNotEmpty ? items : fallback;
-          },
-        )
-        .handleError((_) => fallback);
+    final fallback = _mockApplications
+        .where((a) => a.auditionId == auditionId)
+        .toList();
+    final query = _applications.where('auditionId', isEqualTo: auditionId);
+    return Stream<List<Application>>.multi((controller) {
+      controller.add(fallback);
+      final subscription = query.snapshots().listen(
+        (snapshot) {
+          final items = snapshot.docs
+              .map(
+                (document) => Application.fromMap(document.data(), document.id),
+              )
+              .toList();
+          controller.add(items.isNotEmpty ? items : fallback);
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          controller.add(fallback);
+        },
+        onDone: controller.close,
+      );
+      controller.onCancel = subscription.cancel;
+    });
   }
 
   @override
   Stream<List<Application>> watchMyApplications() {
-    return Stream.fromFuture(_identityProvider.currentIdentity()).asyncExpand(
-      (identity) {
-        final userId = identity?.userId ?? 'usr_cast_201';
-        final fallback = _mockApplications.where((a) {
-          return a.castMemberId == userId ||
-              a.castMemberId == userId.replaceFirst('usr_', '') ||
-              userId == 'usr_${a.castMemberId}';
-        }).toList();
+    return Stream.fromFuture(_identityProvider.currentIdentity())
+        .asyncExpand((identity) {
+          final userId = identity?.userId ?? 'usr_cast_201';
+          final fallback = _mockApplications.where((a) {
+            return a.castMemberId == userId ||
+                a.castMemberId == userId.replaceFirst('usr_', '') ||
+                userId == 'usr_${a.castMemberId}';
+          }).toList();
 
-        return _applications
-            .where('castMemberId', isEqualTo: userId)
-            .snapshots()
-            .map(
-              (s) {
-                final items =
-                    s.docs.map((d) => Application.fromMap(d.data(), d.id)).toList();
+          return _applications
+              .where('castMemberId', isEqualTo: userId)
+              .snapshots()
+              .map((s) {
+                final items = s.docs
+                    .map((d) => Application.fromMap(d.data(), d.id))
+                    .toList();
                 return items.isNotEmpty ? items : fallback;
-              },
-            )
-            .handleError((_) => fallback);
-      },
-    );
+              })
+              .handleError((_) => fallback);
+        });
   }
 
   @override
@@ -258,8 +276,9 @@ class FirebaseAuditionRepository implements AuditionRepository {
     String applicationId,
     ApplicationStatus status,
   ) async {
-    final idx = _mockApplications
-        .indexWhere((a) => a.applicationId == applicationId);
+    final idx = _mockApplications.indexWhere(
+      (a) => a.applicationId == applicationId,
+    );
     if (idx != -1) {
       final old = _mockApplications[idx];
       _mockApplications[idx] = Application(

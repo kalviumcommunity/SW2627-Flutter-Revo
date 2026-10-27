@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../../core/enums/revo_enums.dart';
 import '../../models/cast_assignment.dart';
 import '../../models/production_role.dart';
 import '../../services/firebase_cast_repository.dart';
+import '../../services/cast_repository.dart';
+import '../../services/mock_data_service.dart';
+import '../../services/mock_cast_repository.dart';
 
 class RoleCastAssignmentScreen extends StatefulWidget {
   final String productionId;
 
-  const RoleCastAssignmentScreen({
-    super.key,
-    this.productionId = 'prod_101',
-  });
+  const RoleCastAssignmentScreen({super.key, this.productionId = 'prod_101'});
 
   @override
   State<RoleCastAssignmentScreen> createState() =>
@@ -18,7 +21,16 @@ class RoleCastAssignmentScreen extends StatefulWidget {
 }
 
 class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
-  final FirebaseCastRepository _castRepo = FirebaseCastRepository();
+  late final CastRepository _castRepo;
+
+  @override
+  void initState() {
+    super.initState();
+    _castRepo =
+        Firebase.apps.isNotEmpty && FirebaseAuth.instance.currentUser != null
+        ? FirebaseCastRepository()
+        : MockCastRepository();
+  }
 
   void _showCreateRoleDialog(BuildContext context) {
     final nameController = TextEditingController();
@@ -126,9 +138,7 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(
-                        'Assigned $castId to ${role.name}!',
-                      ),
+                      content: Text('Assigned $castId to ${role.name}!'),
                     ),
                   );
                 }
@@ -155,9 +165,7 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Roles & Cast Assignment'),
-      ),
+      appBar: AppBar(title: const Text('Roles & Cast Assignment')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateRoleDialog(context),
         icon: const Icon(Icons.add),
@@ -165,6 +173,9 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
       ),
       body: StreamBuilder<List<ProductionRole>>(
         stream: _castRepo.watchRoles(widget.productionId),
+        initialData: MockDataService().getRolesForProduction(
+          widget.productionId,
+        ),
         builder: (context, roleSnapshot) {
           if (roleSnapshot.connectionState == ConnectionState.waiting &&
               !roleSnapshot.hasData) {
@@ -173,11 +184,16 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
 
           final roles = roleSnapshot.data ?? [];
           if (roles.isEmpty) {
-            return const Center(child: Text('No roles defined for this production.'));
+            return const Center(
+              child: Text('No roles defined for this production.'),
+            );
           }
 
           return StreamBuilder<List<CastAssignment>>(
             stream: _castRepo.watchAssignments(widget.productionId),
+            initialData: MockDataService().getCastAssignmentsForProduction(
+              widget.productionId,
+            ),
             builder: (context, asgnSnapshot) {
               final assignments = asgnSnapshot.data ?? [];
 
@@ -187,7 +203,11 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
                 itemBuilder: (context, index) {
                   final role = roles[index];
                   final matchingAsgns = assignments
-                      .where((a) => a.roleId == role.roleId && a.status == AssignmentStatus.active)
+                      .where(
+                        (a) =>
+                            a.roleId == role.roleId &&
+                            a.status == AssignmentStatus.active,
+                      )
                       .toList();
 
                   return Card(
@@ -230,32 +250,41 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
                           const SizedBox(height: 8),
 
                           if (matchingAsgns.isEmpty) ...[
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              runSpacing: 8,
+                              spacing: 8,
                               children: [
                                 const Text('No cast member assigned yet.'),
                                 ElevatedButton.icon(
-                                  onPressed: () => _showAssignCastDialog(context, role),
+                                  onPressed: () =>
+                                      _showAssignCastDialog(context, role),
                                   icon: const Icon(Icons.person_add, size: 16),
                                   label: const Text('Assign Cast'),
                                 ),
                               ],
-                            )
+                            ),
                           ] else ...[
                             Column(
                               children: matchingAsgns.map((asgn) {
                                 return Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: theme.colorScheme.surfaceContainerHighest,
+                                    color: theme
+                                        .colorScheme
+                                        .surfaceContainerHighest,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Row(
                                         children: [
-                                          const Icon(Icons.check_circle, color: Colors.green),
+                                          const Icon(
+                                            Icons.check_circle,
+                                            color: Colors.green,
+                                          ),
                                           const SizedBox(width: 8),
                                           Text(
                                             'Cast ID: ${asgn.castMemberId}',
@@ -266,18 +295,24 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
                                         ],
                                       ),
                                       IconButton(
-                                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red,
+                                        ),
                                         tooltip: 'Revoke Assignment',
                                         onPressed: () async {
-                                          await _castRepo.removeAssignment(asgn.assignmentId);
+                                          await _castRepo.removeAssignment(
+                                            asgn.assignmentId,
+                                          );
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Assignment revoked! Role status reverted to Open.',
-                                                ),
-                                              ),
-                                            );
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Assignment revoked! Role status reverted to Open.',
+                                                    ),
+                                                  ),
+                                                );
                                           }
                                         },
                                       ),

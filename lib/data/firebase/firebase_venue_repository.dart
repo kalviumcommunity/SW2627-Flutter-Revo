@@ -91,12 +91,24 @@ class FirebaseVenueRepository implements VenueRepository {
     if (activeOnly) {
       query = query.where('status', whereIn: ['active', 'ACTIVE', 'AVAILABLE']);
     }
-    return query.snapshots().map(
-      (snapshot) {
-        final items = snapshot.docs.map(_fromDocument).toList();
-        return items.isNotEmpty ? items : fallback;
-      },
-    ).handleError((_) => fallback);
+    return Stream<List<Venue>>.multi((controller) {
+      controller.add(fallback);
+      final subscription = query.snapshots().listen(
+        (snapshot) {
+          try {
+            final items = snapshot.docs.map(_fromDocument).toList();
+            controller.add(items.isNotEmpty ? items : fallback);
+          } catch (error) {
+            controller.addError(error);
+          }
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          controller.add(fallback);
+        },
+        onDone: controller.close,
+      );
+      controller.onCancel = subscription.cancel;
+    });
   }
 
   @override
@@ -152,10 +164,7 @@ class FirebaseVenueRepository implements VenueRepository {
     final snapshot = await document.get();
 
     if (!snapshot.exists) {
-      throw RevoException(
-        RevoErrorCode.notFound,
-        'Venue not found.',
-      );
+      throw RevoException(RevoErrorCode.notFound, 'Venue not found.');
     }
 
     await document.delete();

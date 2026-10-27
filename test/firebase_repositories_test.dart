@@ -119,10 +119,13 @@ void main() {
       'status': 'inactive',
     });
 
-    final venues = await FirebaseVenueRepository(
-      firestore: firestore,
-      identityProvider: TestIdentityProvider(null),
-    ).watchVenues().first;
+    final venues =
+        await FirebaseVenueRepository(
+          firestore: firestore,
+          identityProvider: TestIdentityProvider(null),
+        ).watchVenues().firstWhere(
+          (items) => items.any((venue) => venue.venueId == 'active'),
+        );
 
     expect(venues.map((venue) => venue.venueId), ['active']);
   });

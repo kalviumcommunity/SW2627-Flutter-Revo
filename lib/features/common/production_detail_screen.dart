@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../core/constants/revo_colors.dart';
 import '../../core/constants/revo_spacing.dart';
 import '../../core/constants/revo_typography.dart';
@@ -12,6 +13,7 @@ import '../../models/production_role.dart';
 import '../../models/rehearsal.dart';
 import '../../models/venue.dart';
 import '../../services/production_repository.dart';
+import '../../services/mock_production_repository.dart';
 import '../../services/venue_repository.dart';
 import '../admin/venue_management_screen.dart';
 
@@ -34,9 +36,9 @@ class ProductionDetailScreen extends StatefulWidget {
     required this.productionRepository,
     this.venueRepository,
   }) : assert(
-          production != null || productionId != null,
-          'Either production or productionId must be provided',
-        );
+         production != null || productionId != null,
+         'Either production or productionId must be provided',
+       );
 
   @override
   State<ProductionDetailScreen> createState() => _ProductionDetailScreenState();
@@ -71,43 +73,28 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
       if (widget.production != null) {
         _production = widget.production;
       } else if (widget.productionId != null) {
-        _production =
-            await widget.productionRepository.getProduction(widget.productionId!);
+        _production = await widget.productionRepository.getProduction(
+          widget.productionId!,
+        );
       }
 
       if (_production != null) {
-        final pid = _production!.productionId;
-        _directorName = await widget.productionRepository
-            .getDirectorName(_production!.directorId);
-        _roles =
-            await widget.productionRepository.getRolesForProduction(pid);
-        _assignments = await widget.productionRepository
-            .getCastAssignmentsForProduction(pid);
-        _rehearsals = await widget.productionRepository
-            .getRehearsalsForProduction(pid);
-        _venues =
-            await widget.productionRepository.getVenuesForProduction(pid);
-
-        for (final a in _assignments) {
-          if (!_userNames.containsKey(a.castMemberId)) {
-            final name =
-                await widget.productionRepository.getUserName(a.castMemberId);
-            _userNames[a.castMemberId] = name;
-          }
-        }
-
-        for (final r in _rehearsals) {
-          if (!_venueMap.containsKey(r.venueId)) {
-            final v =
-                await widget.productionRepository.getVenueById(r.venueId);
-            if (v != null) {
-              _venueMap[r.venueId] = v;
-            }
-          }
-        }
+        await _loadRelatedData(widget.productionRepository);
       }
     } catch (e) {
-      _errorMessage = e.toString();
+      // The production can already be available locally even when Firestore
+      // denies one of the related metadata reads. Keep the page usable with
+      // the local repository instead of replacing it with an error screen.
+      if (_production != null) {
+        try {
+          await _loadRelatedData(MockProductionRepository());
+          _errorMessage = null;
+        } catch (_) {
+          _errorMessage = e.toString();
+        }
+      } else {
+        _errorMessage = e.toString();
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -115,10 +102,38 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
     }
   }
 
+  Future<void> _loadRelatedData(ProductionRepository repository) async {
+    final production = _production!;
+    final pid = production.productionId;
+    _directorName = await repository.getDirectorName(production.directorId);
+    _roles = await repository.getRolesForProduction(pid);
+    _assignments = await repository.getCastAssignmentsForProduction(pid);
+    _rehearsals = await repository.getRehearsalsForProduction(pid);
+    _venues = await repository.getVenuesForProduction(pid);
+
+    for (final assignment in _assignments) {
+      if (!_userNames.containsKey(assignment.castMemberId)) {
+        _userNames[assignment.castMemberId] = await repository.getUserName(
+          assignment.castMemberId,
+        );
+      }
+    }
+
+    for (final rehearsal in _rehearsals) {
+      if (!_venueMap.containsKey(rehearsal.venueId)) {
+        final venue = await repository.getVenueById(rehearsal.venueId);
+        if (venue != null) {
+          _venueMap[rehearsal.venueId] = venue;
+        }
+      }
+    }
+  }
+
   Future<void> _refresh() async {
     if (_production != null) {
-      final updated =
-          await widget.productionRepository.getProduction(_production!.productionId);
+      final updated = await widget.productionRepository.getProduction(
+        _production!.productionId,
+      );
       if (updated != null) {
         _production = updated;
       }
@@ -130,8 +145,9 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
     final production = _production;
     if (production == null) return;
     final nameController = TextEditingController(text: production.name);
-    final descriptionController =
-        TextEditingController(text: production.description);
+    final descriptionController = TextEditingController(
+      text: production.description,
+    );
     var status = production.status;
     final formKey = GlobalKey<FormState>();
     final saved = await showDialog<bool>(
@@ -146,18 +162,16 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
               TextFormField(
                 controller: nameController,
                 decoration: const InputDecoration(labelText: 'Name'),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? 'Name is required.'
-                        : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Name is required.'
+                    : null,
               ),
               TextFormField(
                 controller: descriptionController,
                 decoration: const InputDecoration(labelText: 'Description'),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? 'Description is required.'
-                        : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Description is required.'
+                    : null,
               ),
               DropdownButtonFormField<ProductionStatus>(
                 initialValue: status,
@@ -201,9 +215,8 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                 }
               } catch (error) {
                 if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(content: Text(error.toString())),
-                  );
+                  ScaffoldMessenger.of(dialogContext)
+                      .showSnackBar(SnackBar(content: Text(error.toString())));
                 }
               }
             },
@@ -239,13 +252,14 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
     );
     if (confirmed != true) return;
     try {
-      await widget.productionRepository.deleteProduction(production.productionId);
+      await widget.productionRepository.deleteProduction(
+        production.productionId,
+      );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
       }
     }
   }
@@ -282,16 +296,24 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
 
   String _formatDate(DateTime dt) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
 
   String _formatTime(DateTime dt) {
-    final hour = dt.hour == 0
-        ? 12
-        : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+    final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
     final minute = dt.minute.toString().padLeft(2, '0');
     final period = dt.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';
@@ -319,7 +341,9 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
         body: Center(
           child: AppStatusState.error(
             title: 'Production Unavailable',
-            message: _errorMessage ?? 'The requested production record could not be found.',
+            message:
+                _errorMessage ??
+                'The requested production record could not be found.',
             actionLabel: 'Retry',
             onAction: _loadData,
           ),
@@ -333,7 +357,8 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
     }
 
     final isDirector = widget.user.role == UserRole.director;
-    final isAssignedDirector = isDirector && prod.directorId == widget.user.userId;
+    final isAssignedDirector =
+        isDirector && prod.directorId == widget.user.userId;
 
     return Scaffold(
       backgroundColor: RevoColors.surfaceContainerLowest,
@@ -385,12 +410,18 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline, color: RevoColors.textSecondary, size: 20),
+                    const Icon(
+                      Icons.info_outline,
+                      color: RevoColors.textSecondary,
+                      size: 20,
+                    ),
                     const SizedBox(width: RevoSpacing.sm),
                     Expanded(
                       child: Text(
                         'Read-only view: You are not the assigned director for this production.',
-                        style: RevoTypography.caption.copyWith(color: RevoColors.textSecondary),
+                        style: RevoTypography.caption.copyWith(
+                          color: RevoColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -445,7 +476,10 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
               ),
               const SizedBox(width: RevoSpacing.md),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
@@ -488,7 +522,11 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.person_pin_circle_outlined, size: 16, color: RevoColors.primary),
+                        const Icon(
+                          Icons.person_pin_circle_outlined,
+                          size: 16,
+                          color: RevoColors.primary,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           directorName,
@@ -517,7 +555,11 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.calendar_month_outlined, size: 16, color: RevoColors.textSecondary),
+                        const Icon(
+                          Icons.calendar_month_outlined,
+                          size: 16,
+                          color: RevoColors.textSecondary,
+                        ),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
@@ -553,7 +595,9 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
           children: [
             Text(
               'Cast & Roles',
-              style: RevoTypography.title2.copyWith(fontWeight: FontWeight.w700),
+              style: RevoTypography.title2.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -563,7 +607,9 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
               ),
               child: Text(
                 '${roles.length} roles',
-                style: RevoTypography.caption.copyWith(fontWeight: FontWeight.w600),
+                style: RevoTypography.caption.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -583,7 +629,8 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
             itemBuilder: (context, index) {
               final role = roles[index];
               final assignment = assignmentMap[role.roleId];
-              final isAssigned = assignment != null || role.status == RoleStatus.assigned;
+              final isAssigned =
+                  assignment != null || role.status == RoleStatus.assigned;
               final actorName = assignment != null
                   ? _userNames[assignment.castMemberId]
                   : null;
@@ -605,7 +652,9 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                           : RevoColors.warningAmber.withValues(alpha: 0.15),
                       child: Icon(
                         isAssigned ? Icons.person : Icons.person_outline,
-                        color: isAssigned ? RevoColors.successGreen : RevoColors.warningAmber,
+                        color: isAssigned
+                            ? RevoColors.successGreen
+                            : RevoColors.warningAmber,
                         size: 20,
                       ),
                     ),
@@ -624,11 +673,18 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: isAssigned
-                                      ? RevoColors.successGreen.withValues(alpha: 0.1)
-                                      : RevoColors.warningAmber.withValues(alpha: 0.1),
+                                      ? RevoColors.successGreen.withValues(
+                                          alpha: 0.1,
+                                        )
+                                      : RevoColors.warningAmber.withValues(
+                                          alpha: 0.1,
+                                        ),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
@@ -647,7 +703,9 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                           const SizedBox(height: 2),
                           Text(
                             role.description,
-                            style: RevoTypography.caption.copyWith(color: RevoColors.textSecondary),
+                            style: RevoTypography.caption.copyWith(
+                              color: RevoColors.textSecondary,
+                            ),
                           ),
                           if (actorName != null) ...[
                             const SizedBox(height: 6),
@@ -655,7 +713,9 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                               children: [
                                 Text(
                                   'Cast to: ',
-                                  style: RevoTypography.caption.copyWith(color: RevoColors.textMuted),
+                                  style: RevoTypography.caption.copyWith(
+                                    color: RevoColors.textMuted,
+                                  ),
                                 ),
                                 Text(
                                   actorName,
@@ -688,19 +748,26 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
           children: [
             Text(
               'Upcoming Rehearsals',
-              style: RevoTypography.title2.copyWith(fontWeight: FontWeight.w700),
+              style: RevoTypography.title2.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: RevoColors.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '${rehearsals.length} scheduled',
-                    style: RevoTypography.caption.copyWith(fontWeight: FontWeight.w600),
+                    style: RevoTypography.caption.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -711,7 +778,8 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
         if (rehearsals.isEmpty)
           AppStatusState.empty(
             title: 'No Upcoming Rehearsals',
-            message: 'No rehearsals are currently scheduled for this production.',
+            message:
+                'No rehearsals are currently scheduled for this production.',
           )
         else
           ListView.separated(
@@ -731,87 +799,116 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                   borderRadius: RevoSpacing.borderRadiusCard,
                   border: Border.all(color: RevoColors.borderDefault),
                 ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: isConfirmed
-                            ? RevoColors.primary.withValues(alpha: 0.15)
-                            : RevoColors.warningAmber.withValues(alpha: 0.15),
-                        child: Icon(
-                          Icons.event_note,
-                          color: isConfirmed ? RevoColors.primary : RevoColors.warningAmber,
-                          size: 20,
-                        ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: isConfirmed
+                          ? RevoColors.primary.withValues(alpha: 0.15)
+                          : RevoColors.warningAmber.withValues(alpha: 0.15),
+                      child: Icon(
+                        Icons.event_note,
+                        color: isConfirmed
+                            ? RevoColors.primary
+                            : RevoColors.warningAmber,
+                        size: 20,
                       ),
-                      const SizedBox(width: RevoSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '${_formatDate(r.startAt)} · ${_formatTime(r.startAt)} – ${_formatTime(r.endAt)}',
-                                  style: RevoTypography.bodyMedium.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                    ),
+                    const SizedBox(width: RevoSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${_formatDate(r.startAt)} · ${_formatTime(r.startAt)} – ${_formatTime(r.endAt)}',
+                                style: RevoTypography.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isConfirmed
+                                      ? RevoColors.primary.withValues(
+                                          alpha: 0.1,
+                                        )
+                                      : RevoColors.warningAmber.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  isConfirmed ? 'CONFIRMED' : 'PROPOSED',
+                                  style: RevoTypography.caption.copyWith(
                                     color: isConfirmed
-                                        ? RevoColors.primary.withValues(alpha: 0.1)
-                                        : RevoColors.warningAmber.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    isConfirmed ? 'CONFIRMED' : 'PROPOSED',
-                                    style: RevoTypography.caption.copyWith(
-                                      color: isConfirmed ? RevoColors.primary : RevoColors.warningAmber,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 10,
-                                    ),
+                                        ? RevoColors.primary
+                                        : RevoColors.warningAmber,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 10,
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on_outlined, size: 14, color: RevoColors.textSecondary),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    venue != null ? '${venue.name} (${venue.location})' : 'Venue TBD',
-                                    style: RevoTypography.caption.copyWith(color: RevoColors.textSecondary),
-                                    overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on_outlined,
+                                size: 14,
+                                color: RevoColors.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  venue != null
+                                      ? '${venue.name} (${venue.location})'
+                                      : 'Venue TBD',
+                                  style: RevoTypography.caption.copyWith(
+                                    color: RevoColors.textSecondary,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.people_outline, size: 14, color: RevoColors.textMuted),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${r.participantIds.length} cast participants scheduled',
-                                  style: RevoTypography.caption.copyWith(color: RevoColors.textMuted),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.people_outline,
+                                size: 14,
+                                color: RevoColors.textMuted,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${r.participantIds.length} cast participants scheduled',
+                                style: RevoTypography.caption.copyWith(
+                                  color: RevoColors.textMuted,
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: RevoSpacing.xs),
-                      const Icon(Icons.chevron_right, size: 18, color: RevoColors.textMuted),
-                    ],
-                  ),
-                );
-              },
+                    ),
+                    const SizedBox(width: RevoSpacing.xs),
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color: RevoColors.textMuted,
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
       ],
     );
@@ -828,7 +925,9 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
           children: [
             Text(
               'Associated Venues',
-              style: RevoTypography.title2.copyWith(fontWeight: FontWeight.w700),
+              style: RevoTypography.title2.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             if (isAdmin)
               TextButton.icon(
@@ -866,7 +965,9 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                 Expanded(
                   child: Text(
                     'No venues have been booked for rehearsals yet.',
-                    style: RevoTypography.bodyMedium.copyWith(color: RevoColors.textSecondary),
+                    style: RevoTypography.bodyMedium.copyWith(
+                      color: RevoColors.textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -894,7 +995,11 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                     CircleAvatar(
                       radius: 18,
                       backgroundColor: RevoColors.surfaceContainerHigh,
-                      child: const Icon(Icons.theater_comedy, color: RevoColors.primary, size: 20),
+                      child: const Icon(
+                        Icons.theater_comedy,
+                        color: RevoColors.primary,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: RevoSpacing.md),
                     Expanded(
@@ -906,20 +1011,31 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                             children: [
                               Text(
                                 v.name,
-                                style: RevoTypography.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+                                style: RevoTypography.bodyLarge.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: isActive
-                                      ? RevoColors.successGreen.withValues(alpha: 0.1)
-                                      : RevoColors.errorCrimson.withValues(alpha: 0.1),
+                                      ? RevoColors.successGreen.withValues(
+                                          alpha: 0.1,
+                                        )
+                                      : RevoColors.errorCrimson.withValues(
+                                          alpha: 0.1,
+                                        ),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
                                   isActive ? 'ACTIVE' : 'MAINTENANCE',
                                   style: RevoTypography.caption.copyWith(
-                                    color: isActive ? RevoColors.successGreen : RevoColors.errorCrimson,
+                                    color: isActive
+                                        ? RevoColors.successGreen
+                                        : RevoColors.errorCrimson,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 10,
                                   ),
@@ -930,7 +1046,9 @@ class _ProductionDetailScreenState extends State<ProductionDetailScreen> {
                           const SizedBox(height: 2),
                           Text(
                             '${v.location} · Capacity: ${v.capacity} persons',
-                            style: RevoTypography.caption.copyWith(color: RevoColors.textSecondary),
+                            style: RevoTypography.caption.copyWith(
+                              color: RevoColors.textSecondary,
+                            ),
                           ),
                         ],
                       ),

@@ -28,10 +28,7 @@ void main() {
   );
 
   Widget createTestWidget(Widget child) {
-    return MaterialApp(
-      theme: RevoTheme.lightTheme,
-      home: child,
-    );
+    return MaterialApp(theme: RevoTheme.lightTheme, home: child);
   }
 
   setUp(() {
@@ -40,76 +37,84 @@ void main() {
 
   group('Phase 3: RehearsalCreationScreen Widget Tests', () {
     testWidgets(
-        'Renders all required sections and controls for authorized Director',
-        (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(
-          RehearsalCreationScreen(
-            user: directorUser,
-            initialProductionId: 'prod_101',
+      'Renders all required sections and controls for authorized Director',
+      (tester) async {
+        await tester.pumpWidget(
+          createTestWidget(
+            RehearsalCreationScreen(
+              user: directorUser,
+              initialProductionId: 'prod_101',
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Screen Header in AppBar and Title
-      expect(find.text('Create Rehearsal'), findsOneWidget);
-      expect(find.text('Schedule Rehearsal Session'), findsOneWidget);
+        // Screen Header in AppBar and Title
+        expect(find.text('Create Rehearsal'), findsOneWidget);
+        expect(find.text('Schedule Rehearsal Session'), findsOneWidget);
 
-      // Section Titles
-      expect(find.text('Production'), findsOneWidget);
-      expect(find.text('Date & Time Window'), findsOneWidget);
-      expect(find.text('Rehearsal Venue'), findsOneWidget);
+        // Section Titles
+        expect(find.text('Production'), findsOneWidget);
+        expect(find.text('Date & Time Window'), findsOneWidget);
+        expect(find.text('Rehearsal Venue'), findsOneWidget);
 
-      // Initial Action Button is Check Conflicts
-      expect(find.widgetWithText(FilledButton, 'Check Conflicts'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, 'Cancel'), findsOneWidget);
-    });
+        // Initial Action Button is Check Conflicts
+        expect(
+          find.widgetWithText(FilledButton, 'Check Conflicts'),
+          findsOneWidget,
+        );
+        expect(find.widgetWithText(OutlinedButton, 'Cancel'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Shows empty state when director has no assigned productions',
-        (tester) async {
+    testWidgets('Shows empty state when director has no assigned productions', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        createTestWidget(
-          RehearsalCreationScreen(user: unassignedDirector),
-        ),
+        createTestWidget(RehearsalCreationScreen(user: unassignedDirector)),
       );
       await tester.pumpAndSettle();
 
       expect(find.text('No Authorized Productions'), findsOneWidget);
       expect(
-          find.textContaining('You are not currently assigned as director'),
-          findsOneWidget);
+        find.textContaining('You are not currently assigned as director'),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
-        'Executes conflict checking and preserves user interaction state',
-        (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(
-          RehearsalCreationScreen(
-            user: directorUser,
-            initialProductionId: 'prod_101',
+      'Executes conflict checking and preserves user interaction state',
+      (tester) async {
+        await tester.pumpWidget(
+          createTestWidget(
+            RehearsalCreationScreen(
+              user: directorUser,
+              initialProductionId: 'prod_101',
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Tap Check Conflicts button
-      final checkButton =
-          find.widgetWithText(FilledButton, 'Check Conflicts');
-      await tester.ensureVisible(checkButton);
-      expect(checkButton, findsOneWidget);
-      await tester.tap(checkButton);
-      await tester.pumpAndSettle();
+        // Tap Check Conflicts button
+        final checkButton = find.widgetWithText(
+          FilledButton,
+          'Check Conflicts',
+        );
+        await tester.ensureVisible(checkButton);
+        expect(checkButton, findsOneWidget);
+        await tester.tap(checkButton);
+        await tester.pumpAndSettle();
 
-      // Form remains functional and responsive
-      expect(find.byType(RehearsalCreationScreen), findsOneWidget);
-    });
+        // Form remains functional and responsive
+        expect(find.byType(RehearsalCreationScreen), findsOneWidget);
+      },
+    );
   });
 
   group('Phase 6: ConflictResolutionScreen Widget Tests', () {
-    testWidgets('Displays structured conflict summary and resolution options',
-        (tester) async {
+    testWidgets('Displays structured conflict summary and resolution options', (
+      tester,
+    ) async {
       final dataService = MockDataService();
       final existingRehearsal = dataService.getRehearsalById('reh_101')!;
 
@@ -156,8 +161,9 @@ void main() {
       expect(find.text('Resolve Conflicts to Confirm'), findsOneWidget);
     });
 
-    testWidgets('Selecting alternative venue revalidates conflict state',
-        (tester) async {
+    testWidgets('Selecting alternative venue revalidates conflict state', (
+      tester,
+    ) async {
       final dataService = MockDataService();
       final existingRehearsal = dataService.getRehearsalById('reh_101')!;
 
@@ -202,33 +208,35 @@ void main() {
 
   group('Phase 5: RehearsalDetailScreen Widget Tests', () {
     testWidgets(
-        'Renders comprehensive rehearsal information for existing record',
-        (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(
-          const RehearsalDetailScreen(
-            rehearsalId: 'reh_101',
-            user: null,
+      'Renders comprehensive rehearsal information for existing record',
+      (tester) async {
+        await tester.pumpWidget(
+          createTestWidget(
+            const RehearsalDetailScreen(rehearsalId: 'reh_101', user: null),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Verify core details
-      expect(find.text('Rehearsal Details'), findsOneWidget);
-      expect(find.text('Act I Blocking & Movement'), findsOneWidget);
-      expect(find.text('CONFIRMED'), findsOneWidget);
-      expect(find.text('Studio A Rehearsal Hall'), findsOneWidget);
-      expect(find.text('The Crucible'), findsOneWidget);
-      expect(find.text('Scheduled Participants'), findsOneWidget);
-      expect(find.text('Alex Rivera'), findsOneWidget);
-      expect(find.text('Maya Lin'), findsOneWidget);
-      expect(find.text('Rehearsal Notes & Directives'), findsOneWidget);
-      expect(find.textContaining('Review opening courtroom choreography'), findsOneWidget);
-    });
+        // Verify core details
+        expect(find.text('Rehearsal Details'), findsOneWidget);
+        expect(find.text('Act I Blocking & Movement'), findsOneWidget);
+        expect(find.text('CONFIRMED'), findsOneWidget);
+        expect(find.text('Studio A Rehearsal Hall'), findsOneWidget);
+        expect(find.text('The Crucible'), findsOneWidget);
+        expect(find.text('Scheduled Participants'), findsOneWidget);
+        expect(find.text('Alex Rivera'), findsOneWidget);
+        expect(find.text('Maya Lin'), findsOneWidget);
+        expect(find.text('Rehearsal Notes & Directives'), findsOneWidget);
+        expect(
+          find.textContaining('Review opening courtroom choreography'),
+          findsOneWidget,
+        );
+      },
+    );
 
-    testWidgets('Gracefully handles invalid or unknown rehearsal ID',
-        (tester) async {
+    testWidgets('Gracefully handles invalid or unknown rehearsal ID', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         createTestWidget(
           const RehearsalDetailScreen(
@@ -241,40 +249,41 @@ void main() {
 
       expect(find.text('Rehearsal Record Not Found'), findsOneWidget);
       expect(
-          find.textContaining('could not be located in the schedule database'),
-          findsOneWidget);
+        find.textContaining('could not be located in the schedule database'),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
-        'Authorized Director can cancel rehearsal from details screen',
-        (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(
-          RehearsalDetailScreen(
-            rehearsalId: 'reh_101',
-            user: directorUser,
+      'Authorized Director can cancel rehearsal from details screen',
+      (tester) async {
+        await tester.pumpWidget(
+          createTestWidget(
+            RehearsalDetailScreen(rehearsalId: 'reh_101', user: directorUser),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Scroll down to cancel button
-      final cancelBtn = find.text('Cancel Rehearsal (BR-08)');
-      await tester.ensureVisible(cancelBtn);
-      expect(cancelBtn, findsOneWidget);
-      await tester.tap(cancelBtn);
-      await tester.pumpAndSettle();
+        // Scroll down to cancel button
+        final cancelBtn = find.widgetWithText(FilledButton, 'Cancel Rehearsal');
+        await tester.ensureVisible(cancelBtn);
+        expect(cancelBtn, findsOneWidget);
+        await tester.tap(cancelBtn);
+        await tester.pumpAndSettle();
 
-      // Confirmation dialog appears
-      expect(find.text('Cancel Rehearsal?'), findsOneWidget);
-      final confirmCancelBtn =
-          find.widgetWithText(FilledButton, 'Cancel Rehearsal');
-      expect(confirmCancelBtn, findsOneWidget);
-      await tester.tap(confirmCancelBtn);
-      await tester.pumpAndSettle();
+        // Confirmation dialog appears
+        expect(find.text('Cancel Rehearsal?'), findsOneWidget);
+        final confirmCancelBtn = find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(FilledButton, 'Cancel Rehearsal'),
+        );
+        expect(confirmCancelBtn, findsOneWidget);
+        await tester.tap(confirmCancelBtn);
+        await tester.pumpAndSettle();
 
-      // Status changes to CANCELLED
-      expect(find.text('CANCELLED'), findsOneWidget);
-    });
+        // Status changes to CANCELLED
+        expect(find.text('CANCELLED'), findsOneWidget);
+      },
+    );
   });
 }
