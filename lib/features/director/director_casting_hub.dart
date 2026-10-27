@@ -25,7 +25,7 @@ class DirectorCastingHub extends StatelessWidget {
                   child: Icon(Icons.record_voice_over, color: theme.colorScheme.onPrimaryContainer),
                 ),
                 title: const Text(
-                  'Audition Postings & Applications (FR-03)',
+                  'Audition Postings & Applications',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: const Text('Post auditions, review cast applicants, and update statuses.'),
@@ -48,7 +48,7 @@ class DirectorCastingHub extends StatelessWidget {
                   child: Icon(Icons.badge, color: theme.colorScheme.onSecondaryContainer),
                 ),
                 title: const Text(
-                  'Roles & Cast Assignment Engine (FR-04, BR-06)',
+                  'Roles & Cast Assignment Engine',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: const Text('Define roles, assign cast members, and auto-sync role status.'),

@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import '../../core/constants/revo_colors.dart';
 import '../../core/constants/revo_spacing.dart';
 import '../../core/constants/revo_typography.dart';
-import '../../core/enums/revo_enums.dart';
 import '../../models/app_user.dart';
 import '../../models/production.dart';
 import '../../services/firebase_auth_service.dart';
@@ -111,7 +110,7 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
         actions: [
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
-            tooltip: 'My Profile (FR-18)',
+            tooltip: 'My Profile',
             onPressed: () {
               Navigator.push(
                 context,
@@ -132,27 +131,6 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                 ),
               );
             },
-          ),
-          PopupMenuButton<UserRole>(
-            icon: const Icon(Icons.swap_horiz),
-            tooltip: 'Switch Demo Role Guard',
-            onSelected: (role) {
-              _authService.switchUserRole(role);
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: UserRole.director,
-                child: Text('Role: Director'),
-              ),
-              PopupMenuItem(
-                value: UserRole.cast,
-                child: Text('Role: Cast Member'),
-              ),
-              PopupMenuItem(
-                value: UserRole.admin,
-                child: Text('Role: Admin'),
-              ),
-            ],
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -557,7 +535,7 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '0 Schedule Conflicts (BR-01..05)',
+                            '0 Schedule Conflicts',
                             style: RevoTypography.bodyMedium.copyWith(
                               fontWeight: FontWeight.w700,
                               color: RevoColors.textPrimary,
@@ -599,7 +577,7 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                     child: _buildActionCard(
                       icon: Icons.record_voice_over_outlined,
                       title: 'Auditions & Casting',
-                      subtitle: 'FR-03 Workflow',
+                      subtitle: 'Manage auditions',
                       color: RevoColors.primary,
                       onTap: widget.onNavigateToAuditions ??
                           () {
@@ -620,7 +598,7 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                     child: _buildActionCard(
                       icon: Icons.badge_outlined,
                       title: 'Role Assignments',
-                      subtitle: 'FR-04 / BR-06',
+                      subtitle: 'Assign cast members',
                       color: const Color(0xFF5B6BBF),
                       onTap: widget.onNavigateToRoles ??
                           () {
@@ -656,7 +634,7 @@ class _DirectorDashboardState extends State<DirectorDashboard> {
                     ),
                   ),
                   title: const Text(
-                    'Production Schedule (FR-09, FR-10)',
+                    'Production Schedule',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: const Text('Production-wide calendar with live real-time stream'),

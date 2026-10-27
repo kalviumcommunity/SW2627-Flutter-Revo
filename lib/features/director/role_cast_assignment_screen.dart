@@ -27,7 +27,7 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Define Production Role (FR-04)'),
+        title: const Text('Define Production Role'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -69,7 +69,7 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Production Role created! Status: OPEN (FR-04)'),
+                    content: Text('Production Role created! Status: OPEN'),
                   ),
                 );
               }
@@ -93,7 +93,7 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'BR-06 Rule: Assigning a cast member will automatically set role status to ASSIGNED.',
+              'Assigning a cast member will automatically mark the role as assigned.',
               style: TextStyle(fontSize: 13, color: Colors.grey),
             ),
             const SizedBox(height: 12),
@@ -127,7 +127,7 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        'Assigned $castId to ${role.name}! Status -> ASSIGNED (BR-06)',
+                        'Assigned $castId to ${role.name}!',
                       ),
                     ),
                   );
@@ -156,7 +156,7 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Roles & Cast Assignment (FR-04, BR-06)'),
+        title: const Text('Roles & Cast Assignment'),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateRoleDialog(context),
@@ -222,7 +222,7 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
 
                           // Active Assignments List
                           Text(
-                            'Active Cast Assignment (BR-06):',
+                            'Active Cast Assignment:',
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -267,14 +267,14 @@ class _RoleCastAssignmentScreenState extends State<RoleCastAssignmentScreen> {
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                        tooltip: 'Revoke Assignment (BR-06 revert to OPEN)',
+                                        tooltip: 'Revoke Assignment',
                                         onPressed: () async {
                                           await _castRepo.removeAssignment(asgn.assignmentId);
                                           if (context.mounted) {
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
-                                                  'Assignment revoked! Role status reverted to OPEN (BR-06).',
+                                                  'Assignment revoked! Role status reverted to Open.',
                                                 ),
                                               ),
                                             );

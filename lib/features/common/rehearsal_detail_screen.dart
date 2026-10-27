@@ -104,7 +104,7 @@ class _RehearsalDetailScreenState extends State<RehearsalDetailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Cancel Rehearsal?'),
         content: const Text(
-          'This will mark the rehearsal as cancelled (BR-08) and release all venue '
+          'This will mark the rehearsal as cancelled and release all venue '
           'and cast member reservations. Cancelled rehearsals will no longer cause scheduling conflicts.',
         ),
         actions: [
@@ -233,7 +233,7 @@ class _RehearsalDetailScreenState extends State<RehearsalDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Pending Synchronization (FR-13)',
+                                'Pending Synchronization',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
@@ -774,7 +774,7 @@ class _RehearsalDetailScreenState extends State<RehearsalDetailScreen> {
                 onPressed: _isLoading ? null : _handleCancelRehearsal,
                 icon: const Icon(Icons.cancel_outlined),
                 label: Text(
-                  _isLoading ? 'Processing...' : 'Cancel Rehearsal (BR-08)',
+                  _isLoading ? 'Processing...' : 'Cancel Rehearsal',
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),

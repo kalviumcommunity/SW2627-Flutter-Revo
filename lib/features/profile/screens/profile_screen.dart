@@ -272,69 +272,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-
-              // Mock Dev Role Switcher (FR-01 testing support)
-              Container(
-                padding: const EdgeInsets.all(RevoSpacing.lg),
-                decoration: BoxDecoration(
-                  color: RevoColors.surfaceContainerLow,
-                  borderRadius: RevoSpacing.borderRadiusCard,
-                  border: Border.all(color: RevoColors.surfaceDim),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.swap_horiz_rounded,
-                          size: 18,
-                          color: RevoColors.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Test Role Switcher (FR-01)',
-                          style: RevoTypography.headline.copyWith(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Switch system roles in-memory to test role-guarded screens.',
-                      style: RevoTypography.bodyMedium.copyWith(
-                        color: RevoColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _roleSwitchChip(
-                          label: 'Director',
-                          role: UserRole.director,
-                          currentRole: user.role,
-                        ),
-                        _roleSwitchChip(
-                          label: 'Cast Member',
-                          role: UserRole.cast,
-                          currentRole: user.role,
-                        ),
-                        _roleSwitchChip(
-                          label: 'Admin',
-                          role: UserRole.admin,
-                          currentRole: user.role,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 24),
 
               // Logout Button
@@ -401,28 +338,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
   }
-
-  Widget _roleSwitchChip({
-    required String label,
-    required UserRole role,
-    required UserRole currentRole,
-  }) {
-    final isSelected = role == currentRole;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      selectedColor: RevoColors.primarySubtle,
-      labelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        color: isSelected ? RevoColors.primary : RevoColors.textPrimary,
-      ),
-      onSelected: (selected) {
-        final auth = _auth;
-        if (selected && auth is MockAuthService) {
-          auth.switchUserRole(role);
-        }
-      },
-    );
-  }
 }
+

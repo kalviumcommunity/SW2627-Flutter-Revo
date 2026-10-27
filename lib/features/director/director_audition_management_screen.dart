@@ -28,7 +28,7 @@ class _DirectorAuditionManagementScreenState
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Create New Audition Posting (FR-03)'),
+        title: const Text('Create New Audition Posting'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,7 +108,7 @@ class _DirectorAuditionManagementScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Audition & Applications (FR-03)'),
+        title: const Text('Audition & Applications'),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateAuditionDialog(context),
@@ -170,7 +170,7 @@ class _DirectorAuditionManagementScreenState
 
                       // Stream of Applicants for this audition (FR-03)
                       Text(
-                        'Applicant Submissions (FR-03):',
+                        'Applicant Submissions:',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),

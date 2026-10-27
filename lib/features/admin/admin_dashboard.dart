@@ -4,7 +4,6 @@ import 'package:firebase_core/firebase_core.dart';
 import '../../core/constants/revo_colors.dart';
 import '../../core/constants/revo_spacing.dart';
 import '../../core/constants/revo_typography.dart';
-import '../../core/enums/revo_enums.dart';
 import '../../models/app_user.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/mock_data_service.dart';
@@ -80,7 +79,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         actions: [
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
-            tooltip: 'My Profile (FR-18)',
+            tooltip: 'My Profile',
             onPressed: () {
               Navigator.push(
                 context,
@@ -101,24 +100,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               );
             },
-          ),
-          PopupMenuButton<UserRole>(
-            icon: const Icon(Icons.swap_horiz),
-            tooltip: 'Switch Demo Role Guard',
-            onSelected: (role) {
-              authService.switchUserRole(role);
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: UserRole.director,
-                child: Text('Role: Director'),
-              ),
-              PopupMenuItem(
-                value: UserRole.cast,
-                child: Text('Role: Cast Member'),
-              ),
-              PopupMenuItem(value: UserRole.admin, child: Text('Role: Admin')),
-            ],
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -398,7 +379,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
-                        'Role guards verified. Use switch icon in top bar to test role switching.',
+                        'Role guards verified. Director, Cast, and Admin access levels enforced.',
                       ),
                       backgroundColor: RevoColors.primary,
                     ),

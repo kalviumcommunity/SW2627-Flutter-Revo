@@ -16,7 +16,7 @@ class MyScheduleScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Schedule (FR-09, FR-10)'),
+        title: const Text('My Schedule'),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),

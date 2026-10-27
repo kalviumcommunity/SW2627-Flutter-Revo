@@ -47,7 +47,7 @@ class _DirectorProductionScheduleScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [   
             const Text(
-              'Production Schedule (FR-09, FR-10)',
+              'Production Schedule',
               style: TextStyle(fontSize: 16),
             ),
             Text(

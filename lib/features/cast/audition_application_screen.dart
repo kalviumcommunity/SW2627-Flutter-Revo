@@ -16,7 +16,7 @@ class AuditionApplicationScreen extends StatelessWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Auditions & Applications (FR-03)'),
+          title: const Text('Auditions & Applications'),
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.search), text: 'Open Auditions'),
@@ -90,7 +90,7 @@ class AuditionApplicationScreen extends StatelessWidget {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
                                           content: Text(
-                                            'Application submitted successfully! (FR-03)',
+                                            'Application submitted successfully!',
                                           ),
                                         ),
                                       );

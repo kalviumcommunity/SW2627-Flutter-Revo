@@ -74,7 +74,7 @@ class _CastDashboardState extends State<CastDashboard> {
                   // Section label
                   _sectionLabel(
                     'Cast Member Actions',
-                    'FR-03 · FR-04 · FR-09 · FR-10 · FR-16',
+                    'Auditions, assignments, and rehearsal schedule',
                   ),
                   const SizedBox(height: 12),
 
@@ -139,7 +139,7 @@ class _CastDashboardState extends State<CastDashboard> {
                     Icons.notifications_outlined,
                     color: Color(0xFF171B26),
                   ),
-                  tooltip: 'Notifications (FR-11)',
+                  tooltip: 'Notifications',
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -176,10 +176,10 @@ class _CastDashboardState extends State<CastDashboard> {
             );
           },
         ),
-        // Profile Screen (FR-18)
+        // Profile Screen
         IconButton(
           icon: const Icon(Icons.account_circle_outlined, color: Color(0xFF171B26)),
-          tooltip: 'My Profile (FR-18)',
+          tooltip: 'My Profile',
           onPressed: () {
             Navigator.push(
               context,
@@ -188,26 +188,6 @@ class _CastDashboardState extends State<CastDashboard> {
               ),
             );
           },
-        ),
-        // Role switcher (dev utility)
-        PopupMenuButton<UserRole>(
-          icon: const Icon(Icons.swap_horiz, color: Color(0xFF8C95A8)),
-          tooltip: 'Switch Demo Role',
-          onSelected: (role) => _authService.switchUserRole(role),
-          itemBuilder: (context) => const [
-            PopupMenuItem(
-              value: UserRole.director,
-              child: Text('Role: Director'),
-            ),
-            PopupMenuItem(
-              value: UserRole.cast,
-              child: Text('Role: Cast Member'),
-            ),
-            PopupMenuItem(
-              value: UserRole.admin,
-              child: Text('Role: Admin'),
-            ),
-          ],
         ),
         IconButton(
           icon: const Icon(Icons.logout, color: Color(0xFF8C95A8)),
@@ -345,7 +325,7 @@ class _CastDashboardState extends State<CastDashboard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '$unread unread notification${unread != 1 ? 's' : ''} · FR-11',
+                            '$unread unread notification${unread != 1 ? 's' : ''}',
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -397,8 +377,8 @@ class _CastDashboardState extends State<CastDashboard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _sectionLabel(
-              'Conflict Detection · FR-07',
-              'Day 3 · ${pendingRehearsals.length} rehearsal${pendingRehearsals.length != 1 ? 's' : ''} pending confirmation',
+              'Conflict Detection',
+              '${pendingRehearsals.length} rehearsal${pendingRehearsals.length != 1 ? 's' : ''} pending confirmation',
             ),
             const SizedBox(height: 10),
             ...pendingRehearsals.map(
@@ -447,7 +427,7 @@ class _CastDashboardState extends State<CastDashboard> {
             icon: Icons.how_to_reg_outlined,
             iconColor: const Color(0xFF3B4A9A),
             label: 'Browse & Apply\nAuditions',
-            badge: 'FR-03',
+            badge: 'Open Roles',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -462,7 +442,7 @@ class _CastDashboardState extends State<CastDashboard> {
             icon: Icons.assignment_ind_outlined,
             iconColor: const Color(0xFF3FA672),
             label: 'My Cast\nAssignments',
-            badge: 'FR-04 · BR-06',
+            badge: 'Assigned',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -500,7 +480,7 @@ class _CastDashboardState extends State<CastDashboard> {
             ),
           ),
           title: 'My Schedule',
-          subtitle: 'FR-09 · Personalized chronological view',
+          subtitle: 'Personalized chronological view',
           liveIndicator: true,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
@@ -616,14 +596,12 @@ class _CastDashboardState extends State<CastDashboard> {
                 icon: Icons.cloud_done_outlined,
                 label: 'Last Synced',
                 value: SyncTimestampFormatter.format(lastSynced),
-                badge: 'FR-12',
               ),
               const SizedBox(height: 8),
               _SyncRow(
                 icon: Icons.verified_outlined,
                 label: 'Data Freshness',
                 value: SyncStatusService.instance.freshness.name.toUpperCase(),
-                badge: 'FR-12',
                 valueColor: SyncStatusService.instance.freshness == DataFreshness.fresh
                     ? const Color(0xFF3FA672)
                     : const Color(0xFF946300),
@@ -633,7 +611,6 @@ class _CastDashboardState extends State<CastDashboard> {
                 icon: Icons.upload_outlined,
                 label: 'Pending Writes',
                 value: '$pending queued',
-                badge: 'FR-13',
                 valueColor: pending > 0
                     ? const Color(0xFF946300)
                     : const Color(0xFF3FA672),
@@ -643,7 +620,6 @@ class _CastDashboardState extends State<CastDashboard> {
                 icon: Icons.wifi_outlined,
                 label: 'Reconnect Reconciliation',
                 value: 'Auto on reconnect',
-                badge: 'FR-14',
               ),
               if (syncState != SyncState.synced) ...[
                 const SizedBox(height: 12),
@@ -659,7 +635,7 @@ class _CastDashboardState extends State<CastDashboard> {
                     ),
                     child: const Center(
                       child: Text(
-                        'Simulate Reconnect & Reconcile  (FR-14)',
+                        'Simulate Reconnect & Reconcile',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -851,7 +827,7 @@ class _NavCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         const Text(
-                          'Live stream · FR-10',
+                          'Live stream',
                           style: TextStyle(
                             fontSize: 10,
                             color: Color(0xFF3FA672),
@@ -946,7 +922,7 @@ class _ConflictDetectedCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10),
             ),
             child: const Text(
-              'Resolve\n(FR-08)',
+              'Resolve',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 11,
@@ -965,14 +941,12 @@ class _SyncRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final String badge;
   final Color? valueColor;
 
   const _SyncRow({
     required this.icon,
     required this.label,
     required this.value,
-    required this.badge,
     this.valueColor,
   });
 
@@ -999,23 +973,8 @@ class _SyncRow extends StatelessWidget {
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
-        const SizedBox(width: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEEF1FB),
-            borderRadius: BorderRadius.circular(9999),
-          ),
-          child: Text(
-            badge,
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF3B4A9A),
-            ),
-          ),
-        ),
       ],
     );
   }
 }
+

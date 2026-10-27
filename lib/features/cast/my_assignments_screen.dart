@@ -12,7 +12,7 @@ class MyAssignmentsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Cast Assignments (FR-04, BR-06)'),
+        title: const Text('My Cast Assignments'),
       ),
       body: StreamBuilder<List<CastAssignment>>(
         stream: castRepo.watchMyAssignments(),
