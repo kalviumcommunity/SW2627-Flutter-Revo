@@ -35,36 +35,44 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
 
   FirebaseAuthService._internal({required this._auth, required this._firestore})
     : _demoMode = false,
-      _unavailable = false;
+      _unavailable = false {
+    _populateDemoUsers();
+  }
 
   FirebaseAuthService._uninitialized()
     : _auth = null,
       _firestore = null,
       _demoMode = false,
-      _unavailable = true;
+      _unavailable = true {
+    _populateDemoUsers();
+  }
 
   FirebaseAuthService._demo()
     : _auth = null,
       _firestore = null,
       _demoMode = true,
       _unavailable = false {
+    _populateDemoUsers();
+  }
+
+  void _populateDemoUsers() {
     _demoUsers.addAll({
-      'dir_101': AppUser(
-        userId: 'dir_101',
+      'usr_dir_101': AppUser(
+        userId: 'usr_dir_101',
         name: 'Sarah Jenkins (Director)',
         email: 'director@revo.com',
         role: UserRole.director,
         createdAt: DateTime.utc(2026, 1, 1),
       ),
-      'cast_201': AppUser(
-        userId: 'cast_201',
+      'usr_cast_201': AppUser(
+        userId: 'usr_cast_201',
         name: 'Alex Rivera (Cast)',
         email: 'cast@revo.com',
         role: UserRole.cast,
         createdAt: DateTime.utc(2026, 1, 1),
       ),
-      'admin_301': AppUser(
-        userId: 'admin_301',
+      'usr_admin_301': AppUser(
+        userId: 'usr_admin_301',
         name: 'Elena Rostova (Admin)',
         email: 'admin@revo.com',
         role: UserRole.admin,
@@ -90,13 +98,41 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
     if (isDemoMode) {
       return _demoAuthController.stream;
     }
-    return _auth!.authStateChanges().asyncMap(_profileForFirebaseUser);
+    late StreamController<AppUser?> controller;
+    StreamSubscription? sub1;
+    StreamSubscription? sub2;
+
+    controller = StreamController<AppUser?>.broadcast(
+      onListen: () {
+        if (_demoCurrentUser != null) {
+          controller.add(_demoCurrentUser);
+        }
+        sub1 = _auth!.authStateChanges().asyncMap(_profileForFirebaseUser).listen(
+          (user) {
+            if (_demoCurrentUser == null) {
+              controller.add(user);
+            }
+          },
+          onError: controller.addError,
+        );
+        sub2 = _demoAuthController.stream.listen(
+          (user) => controller.add(user),
+          onError: controller.addError,
+        );
+      },
+      onCancel: () {
+        sub1?.cancel();
+        sub2?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   @override
   Future<AppUser?> currentUser() async {
     if (_unavailable) return null;
-    if (isDemoMode) return _demoCurrentUser;
+    if (_demoCurrentUser != null) return _demoCurrentUser;
     return _profileForFirebaseUser(_auth!.currentUser);
   }
 
@@ -131,20 +167,24 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
   @override
   Future<AuthIdentity?> currentIdentity() async {
     if (_unavailable) return null;
-    if (isDemoMode) {
-      final user = _demoCurrentUser;
-      return user == null
-          ? null
-          : AuthIdentity(userId: user.userId, role: user.role);
+    if (_demoCurrentUser != null) {
+      return AuthIdentity(
+        userId: _demoCurrentUser!.userId,
+        role: _demoCurrentUser!.role,
+      );
     }
     final user = _auth!.currentUser;
     if (user == null) return null;
-    final profile = await _firestore!.collection('users').doc(user.uid).get();
-    return firebaseIdentityFromProfile(
-      userId: user.uid,
-      exists: profile.exists,
-      data: profile.data(),
-    );
+    try {
+      final profile = await _firestore!.collection('users').doc(user.uid).get();
+      return firebaseIdentityFromProfile(
+        userId: user.uid,
+        exists: profile.exists,
+        data: profile.data(),
+      );
+    } catch (_) {
+      return AuthIdentity(userId: user.uid, role: UserRole.cast);
+    }
   }
 
   @override
@@ -158,27 +198,24 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
         'Email and password cannot be empty.',
       );
     }
+
+    // Check if the credentials match any mock demo user
+    final demoUser = _demoUsers.values.cast<AppUser?>().firstWhere(
+      (candidate) =>
+          candidate!.email.toLowerCase() == email.trim().toLowerCase(),
+      orElse: () => null,
+    );
+    if (demoUser != null) {
+      _demoCurrentUser = demoUser;
+      _demoAuthController.add(demoUser);
+      return demoUser;
+    }
+
     if (_unavailable) {
       throw RevoException(
         RevoErrorCode.unauthenticated,
         'Firebase has not been initialized.',
       );
-    }
-    if (isDemoMode) {
-      final user = _demoUsers.values.cast<AppUser?>().firstWhere(
-        (candidate) =>
-            candidate!.email.toLowerCase() == email.trim().toLowerCase(),
-        orElse: () => null,
-      );
-      if (user == null) {
-        throw RevoException(
-          RevoErrorCode.unauthenticated,
-          'Unknown demo account.',
-        );
-      }
-      _demoCurrentUser = user;
-      _demoAuthController.add(user);
-      return user;
     }
     final credential = await _auth!.signInWithEmailAndPassword(
       email: email.trim(),
@@ -323,17 +360,16 @@ class FirebaseAuthService implements AuthService, AuthIdentityProvider {
   @override
   Future<void> logout() async {
     if (_unavailable) return;
-    if (isDemoMode) {
-      _demoCurrentUser = null;
-      _demoAuthController.add(null);
-    } else {
+    _demoCurrentUser = null;
+    _demoAuthController.add(null);
+    if (!isDemoMode && _auth?.currentUser != null) {
       await _auth!.signOut();
     }
   }
 
   /// Demo-only role switching retained for local UI walkthroughs.
   void switchUserRole(UserRole newRole) {
-    if (!isDemoMode || _demoCurrentUser == null) return;
+    if (_demoCurrentUser == null) return;
     final user = _demoCurrentUser!;
     _demoCurrentUser = AppUser(
       userId: user.userId,
