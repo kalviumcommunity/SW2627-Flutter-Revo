@@ -1,0 +1,222 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userRole() {
+      return signedIn()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+
+    function isAdmin() {
+      return userRole() == "ADMIN" || userRole() == "admin";
+    }
+
+    function isDirector() {
+      return userRole() == "DIRECTOR" || userRole() == "director";
+    }
+
+    function isCast() {
+      return isCastRole(userRole());
+    }
+
+    function isCastRole(role) {
+      return role == "CAST_MEMBER" ||
+        role == "cast_member" ||
+        role == "CAST" ||
+        role == "cast";
+    }
+
+    function validRole(role) {
+      return isAdminRole(role) || isDirectorRole(role) || isCastRole(role);
+    }
+
+    function isAdminRole(role) {
+      return role == "ADMIN" || role == "admin";
+    }
+
+    function isDirectorRole(role) {
+      return role == "DIRECTOR" || role == "director";
+    }
+
+    function hasOnly(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    function nonEmptyString(value) {
+      return value is string && value.size() > 0;
+    }
+
+    function validUserProfile(data) {
+      return hasOnly(data, ['userId', 'name', 'email', 'role', 'createdAt']) &&
+        nonEmptyString(data.userId) &&
+        nonEmptyString(data.name) &&
+        nonEmptyString(data.email) &&
+        validRole(data.role) &&
+        (data.createdAt is timestamp || data.createdAt is string);
+    }
+
+    function validProduction(data) {
+      return hasOnly(data, [
+          'productionId', 'name', 'description', 'directorId', 'startDate',
+          'endDate', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        nonEmptyString(data.productionId) &&
+        nonEmptyString(data.name) &&
+        data.description is string &&
+        nonEmptyString(data.directorId) &&
+        (data.startDate is timestamp || data.startDate is string) &&
+        (data.endDate is timestamp || data.endDate is string) &&
+        data.status in ['planning', 'casting', 'rehearsing', 'completed', 'cancelled'] &&
+        (data.createdAt is timestamp || data.createdAt is string) &&
+        (data.updatedAt is timestamp || data.updatedAt is string);
+    }
+
+    function validVenue(data) {
+      return hasOnly(data, [
+          'venueId', 'name', 'location', 'capacity', 'availability', 'status'
+        ]) &&
+        nonEmptyString(data.name) &&
+        nonEmptyString(data.location) &&
+        data.capacity is int &&
+        data.capacity >= 0 &&
+        data.availability is map &&
+        data.status in ['active', 'inactive'];
+    }
+
+    function validRehearsal(data) {
+      return hasOnly(data, [
+          'rehearsalId', 'productionId', 'venueId', 'startAt', 'endAt',
+          'participantIds', 'status', 'clientPending', 'createdBy', 'createdAt',
+          'updatedAt', 'title', 'notes'
+        ]) &&
+        nonEmptyString(data.rehearsalId) &&
+        nonEmptyString(data.productionId) &&
+        nonEmptyString(data.venueId) &&
+        (data.startAt is timestamp || data.startAt is string) &&
+        (data.endAt is timestamp || data.endAt is string) &&
+        data.participantIds is list &&
+        data.status in ['proposed', 'confirmed', 'cancelled'] &&
+        data.clientPending is bool &&
+        nonEmptyString(data.createdBy) &&
+        (data.createdAt is timestamp || data.createdAt is string) &&
+        (data.updatedAt is timestamp || data.updatedAt is string);
+    }
+
+    function ownsProduction(productionId) {
+      return exists(/databases/$(database)/documents/productions/$(productionId)) &&
+        get(/databases/$(database)/documents/productions/$(productionId)).data.directorId ==
+          request.auth.uid;
+    }
+
+    function managesProduction(productionId) {
+      return isAdmin() || (isDirector() && ownsProduction(productionId));
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() &&
+        (request.auth.uid == uid || isAdmin());
+
+      // Public registration may create only its own explicitly-cast profile.
+      // Administrators may provision other users through this trusted path.
+      allow create: if
+        (signedIn() &&
+         request.auth.uid == uid &&
+         isCastRole(request.resource.data.role) &&
+         validUserProfile(request.resource.data)) ||
+        (isAdmin() &&
+         request.auth.uid != uid &&
+         validUserProfile(request.resource.data) &&
+         request.resource.data.userId == uid);
+
+      allow update: if
+        (request.auth.uid == uid &&
+         request.resource.data.userId == uid &&
+         request.resource.data.role == resource.data.role &&
+         validUserProfile(request.resource.data)) ||
+        (isAdmin() &&
+         request.auth.uid != uid &&
+         validUserProfile(request.resource.data) &&
+         request.resource.data.userId == uid);
+
+      allow delete: if isAdmin();
+    }
+
+    match /productions/{productionId} {
+      allow read: if signedIn();
+      allow create: if validProduction(request.resource.data) &&
+        request.resource.data.productionId == productionId &&
+        (isAdmin() ||
+          (isDirector() && request.resource.data.directorId == request.auth.uid));
+      allow update: if validProduction(request.resource.data) &&
+        request.resource.data.productionId == resource.data.productionId &&
+        request.resource.data.directorId == resource.data.directorId &&
+        (isAdmin() || (isDirector() && resource.data.directorId == request.auth.uid));
+      allow delete: if isAdmin() ||
+        (isDirector() && resource.data.directorId == request.auth.uid);
+    }
+
+    match /auditions/{auditionId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isDirector();
+    }
+
+    match /applications/{applicationId} {
+      allow read: if signedIn();
+      allow create: if isCast();
+      allow update, delete: if isAdmin() || isDirector();
+    }
+
+    match /roles/{roleId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isDirector();
+    }
+
+    match /castAssignments/{assignmentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isDirector();
+    }
+
+    match /rehearsals/{rehearsalId} {
+      allow read: if signedIn();
+      allow create: if validRehearsal(request.resource.data) &&
+        request.resource.data.rehearsalId == rehearsalId &&
+        managesProduction(request.resource.data.productionId) &&
+        request.resource.data.createdBy == request.auth.uid;
+      allow update: if validRehearsal(request.resource.data) &&
+        request.resource.data.rehearsalId == resource.data.rehearsalId &&
+        request.resource.data.productionId == resource.data.productionId &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        managesProduction(request.resource.data.productionId);
+      allow delete: if managesProduction(resource.data.productionId);
+    }
+
+    match /venues/{venueId} {
+      allow read: if signedIn();
+      allow create: if isAdmin() &&
+        validVenue(request.resource.data) &&
+        request.resource.data.venueId == venueId;
+      allow update: if isAdmin() &&
+        validVenue(request.resource.data) &&
+        request.resource.data.venueId == resource.data.venueId;
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() &&
+        resource.data.userId == request.auth.uid;
+
+      allow update: if signedIn() &&
+        resource.data.userId == request.auth.uid;
+
+      allow create: if isAdmin() || isDirector();
+      allow delete: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "461169639709",
+    "project_id": "revo-theatre-management",
+    "storage_bucket": "revo-theatre-management.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:461169639709:android:d38e17cf4d3eb3f70e21f4",
+        "android_client_info": {
+          "package_name": "com.example.sw2627_flutter_revo_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-JNlLN-ekRIp4L8L5EBs1c4E7RxiARN8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

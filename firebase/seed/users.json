@@ -1,0 +1,37 @@
+[
+  {
+    "userId": "user_admin_001",
+    "name": "Revo Admin",
+    "email": "admin@revo.com",
+    "role": "ADMIN",
+    "createdAt": "2026-10-08T10:00:00Z"
+  },
+  {
+    "userId": "user_director_001",
+    "name": "Aarav Sharma",
+    "email": "aarav.director@revo.com",
+    "role": "DIRECTOR",
+    "createdAt": "2026-10-08T10:05:00Z"
+  },
+  {
+    "userId": "user_director_002",
+    "name": "Meera Kapoor",
+    "email": "meera.director@revo.com",
+    "role": "DIRECTOR",
+    "createdAt": "2026-10-08T10:10:00Z"
+  },
+  {
+    "userId": "user_cast_001",
+    "name": "Rohan Verma",
+    "email": "rohan.cast@revo.com",
+    "role": "CAST_MEMBER",
+    "createdAt": "2026-10-08T10:15:00Z"
+  },
+  {
+    "userId": "user_cast_002",
+    "name": "Ananya Singh",
+    "email": "ananya.cast@revo.com",
+    "role": "CAST_MEMBER",
+    "createdAt": "2026-10-08T10:20:00Z"
+  }
+]

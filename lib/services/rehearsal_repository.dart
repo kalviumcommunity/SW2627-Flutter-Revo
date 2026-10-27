@@ -1,0 +1,43 @@
+import '../core/enums/revo_enums.dart';
+import '../core/errors/revo_exception.dart';
+import '../models/app_user.dart';
+import '../models/rehearsal.dart';
+
+class RehearsalInput {
+  final String productionId;
+  final String venueId;
+  final DateTime startAt;
+  final DateTime endAt;
+  final List<String> participantIds;
+  final String? title;
+  final String? notes;
+
+  RehearsalInput({
+    required this.productionId,
+    required this.venueId,
+    required this.startAt,
+    required this.endAt,
+    required this.participantIds,
+    this.title,
+    this.notes,
+  });
+}
+
+class RehearsalSaveResult {
+  final Rehearsal? rehearsal; // set when saved
+  final List<Conflict> conflicts; // non-empty = NOT confirmed
+
+  RehearsalSaveResult({
+    this.rehearsal,
+    this.conflicts = const [],
+  });
+
+  bool get confirmed => rehearsal?.status == RehearsalStatus.confirmed;
+}
+
+abstract class RehearsalRepository {
+  Future<RehearsalSaveResult> createRehearsal(RehearsalInput input, {AppUser? user});
+  Future<RehearsalSaveResult> updateRehearsal(String rehearsalId, RehearsalInput input, {AppUser? user});
+  Future<void> cancelRehearsal(String rehearsalId, {AppUser? user}); // sets status = cancelled (BR-08)
+  Future<Rehearsal> getRehearsal(String rehearsalId);
+}
